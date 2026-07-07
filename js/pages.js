@@ -1,0 +1,617 @@
+// pages.js — app-style tab pages (บริการ / ข่าวสาร / เพิ่มเติม) layered over
+// the 3D map, à la THE SKYTRAINs' bottom-tab structure — but every card here
+// is real: live headway/first-last tables come from service.js data, news is
+// our verified 20฿-policy card + links to official operator channels. No mock
+// promos, no fake feeds.
+
+let ctx = null;
+let pageEl, tabbar;
+
+const OFFICIAL = [
+  ['🟢 BTS (สุขุมวิท/สีลม/ทอง)', 'https://www.bts.co.th'],
+  ['🔵 MRT น้ำเงิน/ม่วง (BEM)', 'https://metro.bemplc.co.th'],
+  ['🟡 สายสีเหลือง/ชมพู', 'https://www.mrta.co.th'],
+  ['🏛️ รฟม. (MRTA)', 'https://www.mrta.co.th'],
+  ['🔴 สายสีแดง (SRTET)', 'https://www.srtet.co.th'],
+  ['📊 Open Data กรมการขนส่งทางราง', 'https://drt.gdcatalog.go.th'],
+];
+
+function esc(s = '') {
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[c]));
+}
+
+function lineName(line) {
+  return esc((line.name_th || line.name_en || '').replace('รถไฟฟ้า', '').trim());
+}
+
+function farePartLabel(group) {
+  return ({
+    bts: 'BTS',
+    bts_gold: 'สายสีทอง',
+    mrt: 'MRT น้ำเงิน/ม่วง',
+    yellow: 'สายสีเหลือง',
+    pink: 'สายสีชมพู',
+    arl: 'ARL',
+    srt: 'สายสีแดง',
+  }[group] ?? group);
+}
+
+function routeLabel(summary) {
+  if (!summary) return 'ยังไม่ได้เลือกเส้นทาง';
+  return `${esc(summary.from)} → ${esc(summary.to)}`;
+}
+
+const PRESET_TRIPS = [
+  ['สยาม', 'ท่าพระ', 'โชว์เปลี่ยน BTS → MRT และเทียบสิทธิ 20 บาท'],
+  ['เตาปูน', 'ศูนย์วัฒนธรรมฯ', 'เส้นทาง MRTA ใต้ดิน อ่านง่ายสำหรับกรรมการ'],
+  ['ห้าแยกลาดพร้าว', 'สำโรง', 'ตัวอย่างข้ามระบบไปสายสีเหลือง/เขียว'],
+  ['บางซื่อ', 'มีนบุรี', 'โชว์การวางแผนไปโซนตะวันออกและสายใหม่'],
+];
+
+const DATA_BADGES = [
+  ['Official/Open Data', 'ค่าโดยสารคู่สถานีและผู้โดยสารจาก Open Data กรมการขนส่งทางราง'],
+  ['Open Map', 'เส้นทาง สถานี อาคาร และทางออกจาก OpenStreetMap'],
+  ['Estimated', 'เวลาเดินรถ ความหนาแน่น และ CO₂ เป็นค่าประมาณ มี label ชัดเจน'],
+  ['Local Only', 'ประวัติ route และ CO₂ สะสมอยู่ใน browser ของผู้ใช้เท่านั้น'],
+];
+
+// ── page renderers ───────────────────────────────────────────────────
+function pageServices() {
+  return `
+  <div class="pg-title">บริการ</div>
+  <div class="pg-hero">
+    <div><b>วางแผนเดินทางแบบใช้ได้จริง</b><br><span>เวลาเดินรถ · ค่าโดยสาร · ซ้อมเดินทาง · ข้อมูลสถานี</span></div>
+    <button class="pg-mini" data-act="fares">ค้นเส้นทาง</button>
+  </div>
+  <div class="pg-sec">ข้อมูลบัตรโดยสาร</div>
+  <div class="pg-grid">
+    <button class="pg-card" data-act="cards">🎫<span>บัตรโดยสาร<br>มีอะไรบ้าง</span></button>
+    <button class="pg-card" data-act="fare20">🏷️<span>สิทธิ 20 บาท<br>ตลอดสาย</span></button>
+    <button class="pg-card" data-act="fareCompare">⚖️<span>เทียบราคา<br>20฿ vs ปกติ</span></button>
+  </div>
+  <div class="pg-sec">ข้อมูลให้บริการ</div>
+  <div class="pg-grid">
+    <button class="pg-card" data-act="fares">💰<span>ค้นเส้นทาง<br>+ ค่าโดยสาร</span></button>
+    <button class="pg-card" data-act="presetTrips">⭐<span>เส้นทาง<br>ตัวอย่าง</span></button>
+    <button class="pg-card" data-act="times">🕐<span>เวลา &amp;<br>ความถี่รถ</span></button>
+    <button class="pg-card" data-act="firstRideHub">🎓<span>ซ้อมนั่ง<br>ครั้งแรก</span></button>
+    <button class="pg-card" data-act="stats">📊<span>ผู้โดยสาร<br>รายเดือน</span></button>
+    <button class="pg-card" data-act="exits">🚪<span>ทางออก &amp;<br>วีลแชร์</span></button>
+    <button class="pg-card" data-act="faq">❓<span>คำถาม<br>ที่พบบ่อย</span></button>
+    <button class="pg-card" data-act="stationGuide">🧭<span>คู่มือ<br>ใช้สถานี</span></button>
+    <button class="pg-card" data-act="rules">🤝<span>มารยาท &amp;<br>ข้อควรระวัง</span></button>
+    <button class="pg-card" data-act="mrtaMode">🏛️<span>MRTA<br>Mode</span></button>
+    <button class="pg-card" data-act="accessibility">♿<span>Accessibility<br>Layer</span></button>
+  </div>`;
+}
+
+function pageTimes() {
+  const rows = ctx.lines.map(l => {
+    const [first, last] = ctx.serviceHours(l.id);
+    const hw = (h) => { const v = ctx.headwayFor(l.id, h); return v == null ? '—' : v; };
+    const closed = hw(2) === '—';
+    return `<tr>
+      <td><span class="pg-dot" style="background:${esc(l.color)}"></span>${lineName(l)}</td>
+      <td>~${first}</td><td>~${last}</td>
+      <td>${hw(6)}</td><td>${hw(8)}</td><td>${hw(13)}</td><td>${hw(18)}</td><td>${hw(23)}</td>
+      <td><span class="pg-tag ${closed ? 'warn' : 'ok'}">${closed ? 'มีช่วงปิด' : 'เปิด'}</span></td></tr>`;
+  }).join('');
+  const cards = ctx.lines.map(l => {
+    const [first, last] = ctx.serviceHours(l.id);
+    const rush = ctx.headwayFor(l.id, 8);
+    const midday = ctx.headwayFor(l.id, 13);
+    const late = ctx.headwayFor(l.id, 23);
+    return `<div class="pg-linecard">
+      <div class="pg-linehead"><span class="pg-dot" style="background:${esc(l.color)}"></span><b>${lineName(l)}</b></div>
+      <div class="pg-metrics">
+        <span><b>~${first}</b><small>รถแรก</small></span>
+        <span><b>~${last}</b><small>รถสุดท้าย</small></span>
+        <span><b>${rush ?? '—'} นาที</b><small>เร่งด่วน</small></span>
+      </div>
+      <div class="pg-note">กลางวัน ~${midday ?? '—'} นาที · ดึก ~${late ?? '—'} นาที · วันหยุด/เหตุพิเศษอาจเปลี่ยน</div>
+    </div>`;
+  }).join('');
+  return `
+  <button class="pg-back" data-act="services">← บริการ</button>
+  <div class="pg-title">เวลา &amp; ความถี่การเดินรถ</div>
+  <div class="pg-hero">
+    <div><b>ตารางเวลาแบบใช้งานเร็ว</b><br><span>ความถี่ = รถมาทุกกี่นาที โดยประมาณจากข้อมูลบริการที่แอปใช้จำลองขบวนรถ</span></div>
+  </div>
+  <div class="pg-sec">สรุปรายสาย</div>
+  <div class="pg-list pg-linegrid">${cards}</div>
+  <div class="pg-sec">ตารางรวม</div>
+  <div class="pg-tablewrap"><table class="pg-table">
+    <tr><th>สาย</th><th>รถแรก</th><th>รถสุดท้าย</th><th>เช้าตรู่</th><th>เร่งด่วน</th><th>กลางวัน</th><th>เย็น</th><th>ดึก</th><th>สถานะ</th></tr>
+    ${rows}
+  </table></div>
+  <div class="pg-note">ตารางนี้เป็นข้อมูลระดับสาย ไม่ใช่ timetable รายสถานีจริง รถเที่ยวแรก/สุดท้ายอาจต่างตามสถานีและปลายทาง ควรเช็คผู้ให้บริการก่อนเดินทางสำคัญ</div>`;
+}
+
+function pageCards() {
+  return `
+  <button class="pg-back" data-act="services">← บริการ</button>
+  <div class="pg-title">บัตรโดยสารมีอะไรบ้าง</div>
+  <div class="pg-list">
+    <div class="pg-item"><b>🎟️ ตั๋ว/เหรียญเที่ยวเดียว</b><br>ซื้อจากตู้อัตโนมัติทุกสถานี เลือกปลายทาง → จ่ายเงิน → BTS ได้บัตรแผ่น, MRT ได้เหรียญกลม (แตะขาเข้า <b>หยอดลงช่อง</b>ขาออก)</div>
+    <div class="pg-item"><b>🐰 บัตร Rabbit</b><br>บัตรเติมเงินของฝั่ง BTS ใช้กับสายสุขุมวิท/สีลม/ทอง และร้านค้าที่ร่วม — เหมาะคนใช้ BTS ประจำ</div>
+    <div class="pg-item"><b>🚇 บัตร MRT</b><br>บัตรเติมเงินของฝั่ง MRT (น้ำเงิน/ม่วง) ออกโดย BEM</div>
+    <div class="pg-item"><b>💳 บัตร EMV (เดบิต/เครดิตแบบแตะ)</b><br>บัตรธนาคารที่มีสัญลักษณ์ contactless แตะที่ประตูได้เลยแทบทุกสาย ไม่ต้องซื้อตั๋ว — สะดวกสุดสำหรับผู้มาเยือน</div>
+    <div class="pg-item"><b>🏷️ สิทธิ 20 บาทตลอดสาย</b><br>ลงทะเบียนบัตรผ่านแอป "ทางรัฐ" แล้วเดินทางข้ามสายที่ร่วมโครงการในราคา 20฿/เที่ยว (ดูเงื่อนไขในการ์ดถัดไป)</div>
+  </div>
+  <div class="pg-note">เงื่อนไข/ราคาบัตรแต่ละชนิดเปลี่ยนได้ — เช็คเว็บทางการก่อนซื้อ</div>`;
+}
+
+function pageFare20() {
+  return `
+  <button class="pg-back" data-act="services">← บริการ</button>
+  <div class="pg-title">สิทธิ 20 บาทตลอดสาย</div>
+  <div class="pg-list">
+    <div class="pg-item">✅ <b>ครอบคลุม 13 เส้นทาง 194 สถานี</b> — เขียว ทอง น้ำเงิน ม่วง เหลือง ชมพู แดง ARL</div>
+    <div class="pg-item">📝 <b>ลงทะเบียนก่อนใช้</b> ผ่านแอป "ทางรัฐ" ผูกบัตร EMV / Rabbit / บัตร MRT ที่จะใช้เดินทาง</div>
+    <div class="pg-item">⏱️ <b>เงื่อนไขเวลา</b> — เปลี่ยนสายแตะเข้าใหม่ภายใน <b>30 นาที</b> · จบทริปภายใน <b>180 นาที</b></div>
+    <div class="pg-item">💳 <b>ข้าม BTS↔MRT ใช้คนละบัตรตามระบบ</b> — ต้องออกประตูแล้วแตะเข้าใหม่</div>
+    <div class="pg-item">📅 <b>ใช้ได้ถึง 30 กันยายน 2569</b> (ตามมติปัจจุบัน — ติดตามการต่ออายุจากภาครัฐ)</div>
+  </div>
+  <button class="pg-cta" data-act="fareCompare">เทียบกับราคาปกติของเส้นทางคุณ →</button>`;
+}
+
+function pageFareCompare() {
+  const s = ctx.fareSummary?.();
+  if (!s) {
+    return `
+    <button class="pg-back" data-act="services">← บริการ</button>
+    <div class="pg-title">เทียบราคา 20฿ vs ปกติ</div>
+    <div class="pg-empty">
+      <b>เลือกเส้นทางก่อน แล้วหน้านี้จะคำนวณให้ทันที</b>
+      <span>ตัวอย่าง: สยาม → ท่าพระ หรือ เตาปูน → ศูนย์วัฒนธรรมฯ</span>
+      <button class="pg-cta" data-act="fares">ไปเลือกต้นทาง-ปลายทาง</button>
+    </div>
+    <div class="pg-list">
+      <div class="pg-item"><b>สิ่งที่จะแสดงหลังเลือก route</b><br>ราคาปกติจากตาราง DRT เมื่อมีข้อมูล · ราคา 20 บาทเมื่อเข้าเงื่อนไข · ส่วนต่างที่ประหยัด · แยกตั๋วตามระบบประตู</div>
+      <div class="pg-item"><b>เงื่อนไขสำคัญ</b><br>ลงทะเบียนผ่านแอปทางรัฐ เปลี่ยนสายภายใน 30 นาที และจบทริปภายใน 180 นาที</div>
+    </div>`;
+  }
+  const saving = s.flat.eligible ? Math.max(0, s.normal.total - 20) : 0;
+  const parts = s.normal.parts.map(p =>
+    `<div class="pg-farepart"><span>${farePartLabel(p.group)}${p.exact ? '' : ' (ประมาณ)'}</span><b>${p.fare}฿</b></div>`).join('');
+  return `
+  <button class="pg-back" data-act="services">← บริการ</button>
+  <div class="pg-title">เทียบราคา 20฿ vs ปกติ</div>
+  <div class="pg-hero">
+    <div><b>${routeLabel(s)}</b><br><span>~${s.minutes} นาที · ${(s.km).toFixed(1)} กม. · ${s.stationCount} สถานี · เปลี่ยน ${s.transfers} ครั้ง</span></div>
+  </div>
+  <div class="pg-compare">
+    <div><span>สิทธิ 20 บาท</span><b>${s.flat.eligible ? '20฿' : 'ไม่เข้าเงื่อนไข'}</b><small>${s.flat.eligible ? 'จบทริปใน 180 นาที' : 'เวลาเดินทางเกินเงื่อนไข'}</small></div>
+    <div><span>ราคาปกติ${s.normal.allExact ? '' : ' (บางช่วงประมาณ)'}</span><b>${s.normal.allExact ? '' : '~'}${s.normal.total}฿</b><small>${s.normal.allExact ? 'อ้างอิง Open Data DRT' : 'มี fallback ladder'}</small></div>
+    <div><span>ประหยัดได้</span><b>${s.flat.eligible ? `${saving}฿` : '—'}</b><small>ต่อเที่ยว เมื่อใช้สิทธิถูกต้อง</small></div>
+  </div>
+  <div class="pg-sec">แยกตามตั๋ว/ระบบประตู</div>
+  <div class="pg-list">${parts}</div>
+  <div class="pg-note">ราคาจริงอาจขึ้นกับบัตร ประเภทผู้โดยสาร โปรโมชัน และประกาศล่าสุดของผู้ให้บริการ</div>`;
+}
+
+function pageDemoMode() {
+  return `
+  <button class="pg-back" data-act="more">← เพิ่มเติม</button>
+  <div class="pg-title">Demo Mode กรรมการ</div>
+  <div class="pg-hero">
+    <div><b>กดครั้งเดียวเพื่อเริ่ม flow โชว์งาน</b><br><span>เปิด MRTA Mode · วางเส้นทางตัวอย่าง · โชว์ค่าโดยสาร 20฿ vs ปกติ · พร้อมกดซ้อมเดินทาง 3D</span></div>
+    <button class="pg-mini" data-act="runDemo">เริ่มเดโม</button>
+  </div>
+  <div class="pg-timeline">
+    <div><b>1</b><span>เปิดแผนที่รวม แล้ว spotlight เฉพาะสาย รฟม.</span></div>
+    <div><b>2</b><span>วาง route ตัวอย่าง สยาม → ท่าพระ เพื่อเห็นการเปลี่ยนสายและค่าโดยสาร</span></div>
+    <div><b>3</b><span>เปิดหน้าเทียบราคา 20 บาท vs ปกติ และอธิบายแหล่งข้อมูล</span></div>
+    <div><b>4</b><span>กดซ้อมเดินทางแบบ 3D หรือ First Ride Simulator</span></div>
+  </div>
+  <div class="pg-grid">
+    <button class="pg-card" data-act="judgeSummary">🏆<span>สรุปสำหรับ<br>กรรมการ</span></button>
+    <button class="pg-card" data-act="presetTrips">⭐<span>เส้นทาง<br>โชว์เร็ว</span></button>
+    <button class="pg-card" data-act="dataSources">📚<span>ที่มา<br>ข้อมูล</span></button>
+  </div>`;
+}
+
+function pageJudgeSummary() {
+  return `
+  <button class="pg-back" data-act="more">← เพิ่มเติม</button>
+  <div class="pg-title">สรุปสำหรับกรรมการ</div>
+  <div class="pg-hero">
+    <div><b>Bangkok Transit 3D = ตัวช่วยก่อนเดินทางจริง</b><br><span>ไม่ใช่แค่แผนที่ แต่ลดความกลัวของผู้ใช้ใหม่ และทำให้นโยบาย 20 บาทเข้าใจได้ทันที</span></div>
+  </div>
+  <div class="pg-list">
+    <div class="pg-item"><b>ปัญหา</b><br>ผู้ใช้จำนวนมากไม่มั่นใจว่าจะขึ้นสายไหน เปลี่ยนสายยังไง จ่ายเท่าไร และกลัวหลงในสถานีใหญ่</div>
+    <div class="pg-item"><b>ทางแก้</b><br>3D route planner + ค่าโดยสารจริง/ประมาณตาม data source + ตารางเวลา + First Ride Simulator + MRTA Mode</div>
+    <div class="pg-item"><b>Impact</b><br>ช่วยให้คนตัดสินใจใช้ระบบรางง่ายขึ้น ลดความกลัวการเปลี่ยนสาย ดันการใช้สิทธิ 20 บาท และสื่อสาร CO₂ ที่ประหยัดได้</div>
+    <div class="pg-item"><b>ต่างจากแอปทั่วไป</b><br>แอปทั่วไปบอกเส้นทาง แต่โปรเจกต์นี้ “ซ้อมการเดินทาง” ให้เห็นภาพก่อนออกจากบ้าน พร้อมข้อมูลที่อ้างอิงได้</div>
+    <div class="pg-item"><b>Scalable</b><br>ต่อ official incident feed, API ค่าโดยสาร, accessibility dataset และ notification เฉพาะสายที่ผู้ใช้ใช้ประจำได้ในเวอร์ชันถัดไป</div>
+  </div>
+  <button class="pg-cta" data-act="runDemo">เริ่ม flow เดโมกรรมการ</button>`;
+}
+
+function pagePresetTrips() {
+  const cards = PRESET_TRIPS.map(([from, to, desc]) =>
+    `<button class="pg-item pg-row pg-preset" data-act="preset:${esc(from)}|${esc(to)}">
+      <span><b>${esc(from)} → ${esc(to)}</b><br><small>${esc(desc)}</small></span><b>เปิด</b>
+    </button>`).join('');
+  return `
+  <button class="pg-back" data-act="services">← บริการ</button>
+  <div class="pg-title">เส้นทางตัวอย่าง</div>
+  <div class="pg-hero">
+    <div><b>ไม่ต้องพิมพ์เองตอนเดโม</b><br><span>เลือก route ที่โชว์ความสามารถคนละมุม: เปลี่ยนสาย, MRTA, ค่าโดยสาร, first ride</span></div>
+  </div>
+  <div class="pg-list">${cards}</div>
+  <div class="pg-note">ถ้าบางสถานีสะกดต่างจาก dataset แอปจะพยายามหาแบบ contains matching และถ้าไม่พบจะไม่เปลี่ยน route เดิม</div>`;
+}
+
+function pageFirstRideHub() {
+  const missions = PRESET_TRIPS.slice(0, 3).map(([from, to, desc]) =>
+    `<button class="pg-item pg-row pg-preset" data-act="mission:${esc(from)}|${esc(to)}">
+      <span><b>${esc(from)} → ${esc(to)}</b><br><small>${esc(desc)}</small></span><b>เริ่มสอน</b>
+    </button>`).join('');
+  return `
+  <button class="pg-back" data-act="services">← บริการ</button>
+  <div class="pg-title">ซ้อมนั่งครั้งแรก</div>
+  <div class="pg-hero">
+    <div><b>ลดความกลัวก่อนขึ้นรถไฟฟ้าจริง</b><br><span>ฝึกเลือกต้นทาง-ปลายทาง อ่านป้ายมุ่งหน้า เปลี่ยนสาย ใช้ทางออก และตอบ quiz ทีละขั้น</span></div>
+    <button class="pg-mini" data-act="firstride">เริ่มทันที</button>
+  </div>
+  <div class="pg-sec">Mission สำเร็จรูป</div>
+  <div class="pg-list">${missions}</div>
+  <div class="pg-list">
+    <div class="pg-item"><b>ใช้ขายกับกรรมการ</b><br>ฟีเจอร์นี้เปลี่ยนแผนที่ให้เป็นเครื่องมือฝึกจริง เหมาะกับนักเรียน ผู้สูงอายุ นักท่องเที่ยว และคนที่ไม่เคยเปลี่ยนสาย</div>
+  </div>`;
+}
+
+function pageFAQ() {
+  const faqs = [
+    ['ต้องเผื่อเวลาเท่าไหร่ก่อนขึ้นครั้งแรก?', 'เผื่อ ~15 นาทีสำหรับซื้อตั๋ว+หาชานชาลา หรือกด "🎓 ซ้อมนั่งครั้งแรก" ในแอปนี้ ซ้อมล่วงหน้า 3 นาทีจากบ้านได้เลย'],
+    ['เหรียญ MRT หายไปในเครื่องตอนขาออก — ปกติไหม?', 'ปกติ! เหรียญเที่ยวเดียวออกแบบให้หยอดคืนที่ประตูขาออก ไม่ใช่เครื่องกิน'],
+    ['ข้าม BTS ↔ MRT ต้องจ่ายใหม่ไหม?', 'เป็นคนละระบบ ต้องออกประตูแล้วแตะเข้าใหม่ — ถ้าลงทะเบียนสิทธิ 20฿ และทำตามเงื่อนไขเวลา ทริปข้ามสายคิดรวม 20฿'],
+    ['รถขบวนแรก/สุดท้ายกี่โมง?', 'ส่วนใหญ่เริ่ม ~05:15-06:00 และหมด ~เที่ยงคืน ต่างกันตามสาย — ดูตาราง "เวลา & ความถี่" ในหน้าบริการ'],
+    ['เด็ก/ผู้สูงอายุมีส่วนลดไหม?', 'มีตามเงื่อนไขของแต่ละผู้ให้บริการ (เช่น เด็กเล็กตามเกณฑ์ส่วนสูงมักฟรี ผู้สูงอายุลดครึ่งราคาบางระบบ) — เช็คเว็บทางการของสายที่ใช้'],
+    ['พาจักรยาน/สัตว์เลี้ยงขึ้นได้ไหม?', 'โดยทั่วไปสัตว์เลี้ยงไม่อนุญาต (ยกเว้นสัตว์นำทาง) จักรยานพับได้บางระบบอนุญาตนอกชั่วโมงเร่งด่วน — กฎต่างกันทุกสาย เช็คทางการก่อน'],
+    ['ลืมของบนรถ/ในสถานี?', 'แจ้งเจ้าหน้าที่สถานีทันที (ทุกสถานีมีจุดบริการ) หรือติดต่อช่องทางทางการของสายนั้นในหน้า "ข่าวสาร"'],
+    ['แอปนี้เป็นแอปทางการหรือเปล่า?', 'ไม่ใช่ — เป็นโปรเจกต์นักเรียนที่ใช้ข้อมูลเปิดภาครัฐ + OpenStreetMap ราคา/เวลาเป็นข้อมูล ณ วันที่ระบุใน "เกี่ยวกับ"'],
+  ];
+  return `
+  <button class="pg-back" data-act="services">← บริการ</button>
+  <div class="pg-title">คำถามที่พบบ่อย</div>
+  <div class="pg-list">${faqs.map(([q, a]) =>
+    `<details class="pg-faq"><summary>${q}</summary><p>${a}</p></details>`).join('')}
+  </div>`;
+}
+
+function pageStationGuide() {
+  return `
+  <button class="pg-back" data-act="services">← บริการ</button>
+  <div class="pg-title">คู่มือใช้สถานี</div>
+  <div class="pg-list">
+    <div class="pg-item"><b>1. เช็กสถานีก่อนออกจากบ้าน</b><br>พิมพ์ต้นทาง-ปลายทางในแผนที่ แล้วดูสายที่ต้องขึ้น สถานีเปลี่ยนขบวน ค่าโดยสาร และเวลาประมาณการก่อนเดินทางจริง</div>
+    <div class="pg-item"><b>2. อ่านป้าย “มุ่งหน้า...”</b><br>เวลาเข้าชานชาลาให้ดูปลายทางของสาย เช่น มุ่งหน้าคูคต / เคหะฯ / หลักสอง ไม่ใช่ดูแค่สีสายอย่างเดียว</div>
+    <div class="pg-item"><b>3. เปลี่ยนสายให้เผื่อเวลา</b><br>บางจุดเป็นสถานีเชื่อมในอาคารเดียวกัน บางจุดต้องออกประตูแล้วเดินต่อ แอปจะแสดง transfer ใน route card เพื่อให้เห็นล่วงหน้า</div>
+    <div class="pg-item"><b>4. ทางออกและลิฟต์</b><br>กดสถานีบนแผนที่เพื่อดูข้อมูลทางออกจาก OpenStreetMap ถ้าข้อมูลยังไม่ครบ แอประบุตรง ๆ เพื่อไม่ทำให้หลง</div>
+    <div class="pg-item"><b>5. ซ้อมเที่ยวแรก</b><br>ถ้ายังไม่เคยขึ้น กด “ซ้อมนั่งครั้งแรก” เพื่อฝึกตั้งแต่ซื้อตั๋ว แตะบัตร เลือกชานชาลา เปลี่ยนสาย และออกสถานี</div>
+  </div>`;
+}
+
+function pageAccessibility() {
+  return `
+  <button class="pg-back" data-act="services">← บริการ</button>
+  <div class="pg-title">Accessibility Layer</div>
+  <div class="pg-hero">
+    <div><b>ทำให้ระบบรางใช้ง่ายขึ้นสำหรับทุกคน</b><br><span>รวมลิฟต์ ทางออก วีลแชร์ ตัวหนังสือใหญ่ และข้อจำกัดข้อมูลไว้ในที่เดียว</span></div>
+    <button class="pg-mini" data-act="exits">ดูสถานีที่มีทางออก</button>
+  </div>
+  <div class="pg-list">
+    <div class="pg-item"><b>ข้อมูลทางออก/วีลแชร์</b><br>เมื่อแตะสถานี แอปดึงข้อมูลทางออกจาก OpenStreetMap และแสดงจำนวนทางออก/จุดที่ระบุ wheelchair ได้เท่าที่ dataset มี</div>
+    <div class="pg-item"><b>โหมดตัวหนังสือใหญ่</b><br>เปิดได้จากหน้าเพิ่มเติมหรือปุ่ม 🔎 เพื่อให้ route card, station sheet และคำอธิบายอ่านง่ายขึ้น</div>
+    <div class="pg-item"><b>ข้อจำกัดที่ต้องบอกตรง ๆ</b><br>ข้อมูล accessibility ยังไม่ครบทุกสถานี เพราะขึ้นกับ OSM/community mapping ไม่ควรใช้แทนประกาศทางการในกรณีจำเป็นสูง</div>
+    <div class="pg-item"><b>เวอร์ชันถัดไป</b><br>ต่อ official accessibility dataset, ทำ filter “ต้องมีลิฟต์”, และเพิ่ม route ที่หลีกเลี่ยงบันไดเมื่อข้อมูลครบ</div>
+  </div>`;
+}
+
+function pageRules() {
+  return `
+  <button class="pg-back" data-act="services">← บริการ</button>
+  <div class="pg-title">มารยาท &amp; ข้อควรระวัง</div>
+  <div class="pg-list">
+    <div class="pg-item">🚶 <b>ยืนชิดด้านข้างก่อนขึ้น</b><br>รอให้ผู้โดยสารออกจากขบวนก่อน แล้วค่อยเดินเข้า</div>
+    <div class="pg-item">🎒 <b>ช่วงเร่งด่วนให้ถอดกระเป๋าเป้</b><br>ถือไว้ด้านหน้าเพื่อลดการชนคนอื่นและช่วยให้คนเข้า-ออกได้เร็วขึ้น</div>
+    <div class="pg-item">🛗 <b>ลิฟต์ให้ผู้จำเป็นใช้ก่อน</b><br>ผู้ใช้วีลแชร์ ผู้สูงอายุ เด็กเล็ก รถเข็น และผู้บาดเจ็บควรได้สิทธิก่อน</div>
+    <div class="pg-item">📢 <b>ถ้าเกิดเหตุผิดปกติ</b><br>แจ้งเจ้าหน้าที่สถานีหรือใช้ปุ่มฉุกเฉินตามจุดที่กำหนด อย่าวิ่งลงรางหรือเปิดประตูเอง</div>
+    <div class="pg-item">🧾 <b>เก็บบัตร/เหรียญไว้จนออกสถานี</b><br>โดยเฉพาะเหรียญ MRT ต้องใช้หยอดคืนที่ประตูขาออก</div>
+  </div>`;
+}
+
+function pageNews() {
+  return `
+  <div class="pg-title">ข่าวสาร &amp; โปรโมชัน</div>
+  <div class="pg-item pg-highlight">🏷️ <b>นโยบาย 20 บาทตลอดสาย ใช้ได้ถึง 30 ก.ย. 2569</b><br>
+    ลงทะเบียนผ่านแอปทางรัฐ · เปลี่ยนสายใน 30 นาที · จบทริปใน 180 นาที
+    <button class="pg-mini" data-act="fare20">ดูเงื่อนไขเต็ม</button></div>
+  <div class="pg-item">🚧 <b>สายที่กำลังมา</b> — สายสีส้ม (ศูนย์วัฒนธรรมฯ–มีนบุรี ช่วงแรก) อยู่ระหว่างเตรียมเปิดให้บริการ
+    ติดตามประกาศจาก รฟม.</div>
+  <div class="pg-sec">เมนูข่าวสาร</div>
+  <div class="pg-grid">
+    <button class="pg-card" data-act="promos">🏷️<span>โปรโมชัน<br>ทางการ</span></button>
+    <button class="pg-card" data-act="announcements">📢<span>ประกาศ<br>ผู้ให้บริการ</span></button>
+    <button class="pg-card" data-act="serviceNotice">🚧<span>สถานะบริการ<br>และเหตุพิเศษ</span></button>
+    <button class="pg-card" data-act="officialLinks">🔗<span>ช่องทาง<br>ทางการ</span></button>
+    <button class="pg-card" data-act="incidentFeed">⚙️<span>Incident<br>roadmap</span></button>
+  </div>
+  <div class="pg-note">เราไม่ทำ feed ข่าวปลอมในแอปนี้ เพราะโปรโมชันและประกาศเปลี่ยนได้ตลอด จึงพาไปแหล่งทางการแทน</div>`;
+}
+
+function pageMRTA() {
+  const mrtaLines = ctx.lines.filter(l => ['mrt_blue', 'mrt_purple', 'mrt_yellow', 'mrt_pink'].includes(l.id));
+  const rows = mrtaLines.map(l => {
+    const [first, last] = ctx.serviceHours(l.id);
+    const rush = ctx.headwayFor(l.id, 8);
+    return `<tr><td><span class="pg-dot" style="background:${esc(l.color)}"></span>${lineName(l)}</td><td>~${first}</td><td>~${last}</td><td>${rush ?? '—'} นาที</td></tr>`;
+  }).join('');
+  return `
+  <button class="pg-back" data-act="more">← เพิ่มเติม</button>
+  <div class="pg-title">MRTA Mode</div>
+  <div class="pg-hero">
+    <div><b>โหมดสำหรับเวที MRTA</b><br><span>เน้นสายภายใต้บริบท รฟม.: น้ำเงิน ม่วง เหลือง ชมพู และซ่อนสายอื่นชั่วคราว</span></div>
+    <button class="pg-mini" data-act="activateMRTA">เปิดโหมด</button>
+  </div>
+  <div class="pg-tablewrap"><table class="pg-table">
+    <tr><th>สาย</th><th>รถแรก</th><th>รถสุดท้าย</th><th>เร่งด่วน</th></tr>
+    ${rows}
+  </table></div>
+  <div class="pg-list">
+    <div class="pg-item"><b>ใช้ตอนพรีเซนต์</b><br>เริ่มจากแผนที่รวม แล้วกด MRTA Mode เพื่ออธิบายว่าระบบช่วยผู้โดยสารของ รฟม. ยังไง: ตารางเวลา, ค่าโดยสาร, ทางออก, first-ride simulator</div>
+    <div class="pg-item"><b>กลับเป็นแผนที่รวม</b><br>กดชิปสายทางซ้ายเพื่อเปิด/ปิด หรือรีเฟรชหน้าเพื่อกลับค่าเริ่มต้น</div>
+  </div>`;
+}
+
+function pagePromos() {
+  return `
+  <button class="pg-back" data-act="news">← ข่าวสาร</button>
+  <div class="pg-title">โปรโมชันทางการ</div>
+  <div class="pg-body">หน้านี้ทำหน้าที่เป็น “ประตูรวม” ไปยังโปรโมชันจริงของแต่ละระบบ แทนการคัดลอกข้อความมาเก็บไว้จนหมดอายุ</div>
+  <div class="pg-list">
+    <a class="pg-item pg-link" href="https://www.bts.co.th" target="_blank" rel="noopener">🟢 BTS / Rabbit: โปรโมชันและข่าวสาร ↗</a>
+    <a class="pg-item pg-link" href="https://metro.bemplc.co.th" target="_blank" rel="noopener">🔵 MRT Blue/Purple: ข่าวและสิทธิพิเศษ BEM ↗</a>
+    <a class="pg-item pg-link" href="https://www.mrta.co.th" target="_blank" rel="noopener">🟡 MRTA / Yellow / Pink / โครงการใหม่ ↗</a>
+    <a class="pg-item pg-link" href="https://www.srtet.co.th" target="_blank" rel="noopener">🔴 รถไฟฟ้าสายสีแดง / Airport Rail Link ↗</a>
+  </div>
+  <div class="pg-note">ข้อดีสำหรับกรรมการ: ข้อมูลไม่กลายเป็น mock content และลดความเสี่ยงที่ผู้ใช้เห็นโปรโมชันหมดอายุ</div>`;
+}
+
+function pageAnnouncements() {
+  return `
+  <button class="pg-back" data-act="news">← ข่าวสาร</button>
+  <div class="pg-title">ประกาศผู้ให้บริการ</div>
+  <div class="pg-list">
+    ${OFFICIAL.map(([label, url]) =>
+      `<a class="pg-item pg-link" href="${esc(url)}" target="_blank" rel="noopener">${esc(label)} ↗</a>`).join('')}
+  </div>
+  <div class="pg-note">เหมาะสำหรับเช็กประกาศปิดปรับปรุง จุดเชื่อมต่อพิเศษ เวลาบริการวันหยุด และเงื่อนไขบัตรโดยสารล่าสุด</div>`;
+}
+
+function pageServiceNotice() {
+  return `
+  <button class="pg-back" data-act="news">← ข่าวสาร</button>
+  <div class="pg-title">สถานะบริการและเหตุพิเศษ</div>
+  <div class="pg-list">
+    <div class="pg-item"><b>สถานะ real-time</b><br>โปรเจกต์นี้ยังไม่มี API เหตุขัดข้องแบบสด จึงไม่แสดงสถานะปลอม ถ้าจะทำต่อควรต่อ feed ทางการหรือระบบ admin สำหรับประกาศฉุกเฉิน</div>
+    <div class="pg-item"><b>สิ่งที่แอปทำได้ตอนนี้</b><br>จำลองความถี่รถตามช่วงเวลา เปิดดูขบวนวิ่งบนแผนที่ และดูเวลาเปิด-ปิดโดยประมาณรายสาย</div>
+    <div class="pg-item"><b>แนวทางเวอร์ชันถัดไป</b><br>เพิ่ม incident banner หน้าแรก, push notification เฉพาะสายที่ผู้ใช้บันทึกไว้, และ badge สีบน route card เมื่อมีเหตุผิดปกติ</div>
+  </div>`;
+}
+
+function pageIncidentFeed() {
+  return `
+  <button class="pg-back" data-act="news">← ข่าวสาร</button>
+  <div class="pg-title">Incident Feed Placeholder</div>
+  <div class="pg-hero">
+    <div><b>พร้อมต่อ feed ทางการ แต่ไม่แสดงเหตุขัดข้องปลอม</b><br><span>หน้านี้อธิบาย architecture ที่จะต่อในเวอร์ชัน production</span></div>
+  </div>
+  <div class="pg-list">
+    <div class="pg-item"><b>สถานะปัจจุบัน</b><br>ยังไม่มี official realtime incident API ในโปรเจกต์นี้ จึงไม่ mock เหตุขัดข้องเพื่อหลอกว่ามีข้อมูลสด</div>
+    <div class="pg-item"><b>Schema ที่รองรับได้</b><br>line_id · severity · station_range · started_at · updated_at · title_th · body_th · official_url</div>
+    <div class="pg-item"><b>UI ที่จะใช้</b><br>banner บนแผนที่, badge บน route card, push notification เฉพาะสายที่ผู้ใช้บันทึกไว้, และ timeline ในหน้าข่าวสาร</div>
+    <div class="pg-item"><b>เหตุผลเชิงความน่าเชื่อถือ</b><br>ข้อมูลฉุกเฉินต้องมาจากต้นทางจริงเท่านั้น เพราะมีผลต่อการเดินทางและความปลอดภัยของผู้ใช้</div>
+  </div>`;
+}
+
+function pageOfficialLinks() {
+  return `
+  <button class="pg-back" data-act="news">← ข่าวสาร</button>
+  <div class="pg-title">ช่องทางทางการ</div>
+  <div class="pg-sec">โปรโมชัน/ประกาศทางการ (เปิดจากต้นทางจริง)</div>
+  <div class="pg-body">โปรโมชันเปลี่ยนตลอดเวลา — เราไม่คัดลอกมาแปะให้ข้อมูลเก่าค้าง
+  แต่รวมประตูไปหน้าทางการของทุกค่ายไว้ให้ที่เดียว:</div>
+  <div class="pg-list">${OFFICIAL.map(([label, url]) =>
+    `<a class="pg-item pg-link" href="${esc(url)}" target="_blank" rel="noopener">${esc(label)} ↗</a>`).join('')}
+  </div>
+  <div class="pg-note">ลิงก์เปิดเว็บทางการในแท็บใหม่ — เนื้อหาในนั้นเป็นของผู้ให้บริการแต่ละราย</div>`;
+}
+
+function pageMore() {
+  return `
+  <div class="pg-title">เพิ่มเติม</div>
+  <div class="pg-hero">
+    <div><b>พร้อมส่งประกวด</b><br><span>เดโมกรรมการ · pitch summary · data trust · accessibility · incident roadmap</span></div>
+    <button class="pg-mini" data-act="demoMode">เดโม</button>
+  </div>
+  <div class="pg-sec">ส่งประกวด / เดโม</div>
+  <div class="pg-list">
+    <button class="pg-item pg-row" data-act="demoMode">🎬 Demo Mode ปุ่มเดียว <span>›</span></button>
+    <button class="pg-item pg-row" data-act="judgeSummary">🏆 สรุปสำหรับกรรมการ <span>›</span></button>
+    <button class="pg-item pg-row" data-act="presetTrips">⭐ เส้นทางตัวอย่าง / Preset Trips <span>›</span></button>
+    <button class="pg-item pg-row" data-act="firstRideHub">🎓 First Ride mission cards <span>›</span></button>
+  </div>
+  <div class="pg-sec">ตั้งค่าการใช้งาน</div>
+  <div class="pg-list">
+    <button class="pg-item pg-row" data-act="theme">🌗 สลับโหมดกลางวัน / กลางคืน <span>›</span></button>
+    <button class="pg-item pg-row" data-act="big">🔎 โหมดตัวหนังสือใหญ่ <span>›</span></button>
+    <button class="pg-item pg-row" data-act="mrtaMode">🏛️ MRTA Mode สำหรับเดโมกรรมการ <span>›</span></button>
+    <button class="pg-item pg-row" data-act="clear">🧹 ล้างประวัติการค้นหา/สถิติในเครื่อง <span>›</span></button>
+  </div>
+  <div class="pg-sec">เกี่ยวกับ</div>
+  <div class="pg-list">
+    <button class="pg-item pg-row" data-act="about">ℹ️ เกี่ยวกับแอป + ที่มาข้อมูล + ผลกระทบ <span>›</span></button>
+    <button class="pg-item pg-row" data-act="dataSources">📚 ที่มาข้อมูลแบบละเอียด <span>›</span></button>
+    <button class="pg-item pg-row" data-act="dataStatus">🏷️ สถานะข้อมูล / data labels <span>›</span></button>
+    <button class="pg-item pg-row" data-act="accessibility">♿ Accessibility Layer <span>›</span></button>
+    <button class="pg-item pg-row" data-act="incidentFeed">🚧 Incident Feed roadmap <span>›</span></button>
+    <button class="pg-item pg-row" data-act="fareCompare">⚖️ เทียบค่าโดยสาร 20฿ vs ปกติ <span>›</span></button>
+    <button class="pg-item pg-row" data-act="contact">☎️ ติดต่อผู้ให้บริการ / ของหาย <span>›</span></button>
+    <button class="pg-item pg-row" data-act="privacy">🔐 ความเป็นส่วนตัว <span>›</span></button>
+    <button class="pg-item pg-row" data-act="onboard">🎬 ดูวิธีใช้อีกครั้ง <span>›</span></button>
+    <div class="pg-item">🏷️ เวอร์ชัน 1.0 · ข้อมูล: ค่าโดยสาร เม.ย. 2569 · ผู้โดยสาร มี.ค. 2569 · แผนที่ OSM ก.ค. 2569<br>
+    <span class="pg-note">โปรเจกต์นักเรียนเพื่อ MRTA Innovation Camp 2026 · © OpenStreetMap contributors (ODbL)</span></div>
+  </div>`;
+}
+
+function pageDataStatus() {
+  const badges = DATA_BADGES.map(([label, desc]) =>
+    `<div class="pg-badgecard"><b>${esc(label)}</b><span>${esc(desc)}</span></div>`).join('');
+  return `
+  <button class="pg-back" data-act="more">← เพิ่มเติม</button>
+  <div class="pg-title">สถานะข้อมูล</div>
+  <div class="pg-grid pg-badgegrid">${badges}</div>
+  <div class="pg-list">
+    <div class="pg-item"><b>ทำไมต้องแยก label</b><br>ข้อมูลบางอย่างเป็น official/open data แต่บางอย่างเป็นค่าประมาณเพื่อ simulation การแยก label ทำให้กรรมการเห็นว่าทีมไม่มั่วข้อมูล</div>
+    <div class="pg-item"><b>ใช้ใน pitch</b><br>บอกว่าแอปนี้ตั้งใจ “โปร่งใสเรื่องข้อมูล” ตั้งแต่ prototype ไม่รอให้เป็น production ก่อน</div>
+  </div>`;
+}
+
+function pageDataSources() {
+  const rows = [
+    ['เส้นทาง · สถานี · อาคาร · ทางออก', 'OpenStreetMap contributors (ODbL)', 'แผนที่ OSM ก.ค. 2569', 'ใช้วาด 3D network และข้อมูลทางออก'],
+    ['ค่าโดยสารคู่สถานี', 'Open Data กรมการขนส่งทางราง', 'เม.ย. 2569', 'ใช้เมื่อพบคู่สถานีใน fare_lookup.json'],
+    ['ผู้โดยสารรายเดือน', 'Open Data กรมการขนส่งทางราง', 'มี.ค. 2569', 'ใช้แผงสถิติและชั้นข้อมูล ridership'],
+    ['ความถี่และเวลาเปิด-ปิด', 'ข้อมูลเผยแพร่ของผู้ให้บริการ + service.js', 'ประมาณ 2025-2026', 'ใช้จำลองขบวนและตารางเวลาระดับสาย'],
+    ['นโยบาย 20 บาท', 'ประกาศภาครัฐ/รฟม. ตามเงื่อนไขปัจจุบัน', 'ใช้ได้ถึง 30 ก.ย. 2569', 'ใช้เปรียบเทียบค่าโดยสารและ route card'],
+    ['CO₂ ที่ประหยัดได้', 'ค่าประมาณ emission factor สาธารณะ', 'ประมาณการ', 'ใช้สื่อสารผลกระทบเชิงสิ่งแวดล้อม'],
+  ].map(([topic, source, date, use]) =>
+    `<tr><td>${topic}</td><td>${source}</td><td>${date}</td><td>${use}</td></tr>`).join('');
+  return `
+  <button class="pg-back" data-act="more">← เพิ่มเติม</button>
+  <div class="pg-title">ที่มาข้อมูล</div>
+  <div class="pg-tablewrap"><table class="pg-table pg-source-table">
+    <tr><th>ข้อมูล</th><th>แหล่งที่มา</th><th>วันที่/สถานะ</th><th>ใช้ทำอะไร</th></tr>
+    ${rows}
+  </table></div>
+  <div class="pg-list">
+    <div class="pg-item"><b>หลักการของแอป</b><br>ข้อมูลที่เปลี่ยนบ่อย เช่น โปรโมชันหรือประกาศเหตุขัดข้อง จะไม่คัดลอกมาเป็น feed ปลอม แต่เปิดลิงก์ไปต้นทางจริง</div>
+    <div class="pg-item"><b>ข้อจำกัดที่บอกตรง ๆ</b><br>เวลาเดินรถเป็นระดับสาย ทางออกขึ้นกับความครบถ้วนของ OSM และราคาจริงอาจขึ้นกับบัตร/สิทธิ/ประกาศล่าสุด</div>
+  </div>`;
+}
+
+function pageContact() {
+  return `
+  <button class="pg-back" data-act="more">← เพิ่มเติม</button>
+  <div class="pg-title">ติดต่อ / ของหาย</div>
+  <div class="pg-list">
+    <div class="pg-item"><b>ของหายในสถานีหรือบนขบวน</b><br>จำชื่อสถานี เวลา สาย และทิศทางขบวนให้ได้มากที่สุด แล้วติดต่อเจ้าหน้าที่สถานีหรือช่องทางทางการของผู้ให้บริการสายนั้น</div>
+    <div class="pg-item"><b>เหตุฉุกเฉินในสถานี</b><br>แจ้งเจ้าหน้าที่ใกล้ที่สุดทันที ใช้ปุ่มฉุกเฉินตามจุดที่กำหนด และทำตามประกาศในสถานี</div>
+    <div class="pg-item"><b>ช่องทางออนไลน์</b><br>ใช้หน้า “ช่องทางทางการ” เพื่อไปยังเว็บของ BTS, BEM, MRTA, SRTET และ Open Data โดยตรง</div>
+  </div>
+  <button class="pg-cta" data-act="officialLinks">เปิดช่องทางทางการ →</button>`;
+}
+
+function pagePrivacy() {
+  return `
+  <button class="pg-back" data-act="more">← เพิ่มเติม</button>
+  <div class="pg-title">ความเป็นส่วนตัว</div>
+  <div class="pg-list">
+    <div class="pg-item"><b>ข้อมูลที่เก็บในเครื่อง</b><br>ประวัติ route ล่าสุด, สถานะ onboarding และค่าประมาณ CO₂ ถูกเก็บไว้ใน browser ของเครื่องนี้เท่านั้น</div>
+    <div class="pg-item"><b>ตำแหน่งปัจจุบัน</b><br>ใช้เฉพาะเมื่อกดปุ่มสถานีใกล้ฉัน และ browser จะถามสิทธิก่อนเสมอ แอปไม่ได้ส่งตำแหน่งไป server ของเรา</div>
+    <div class="pg-item"><b>ล้างข้อมูล</b><br>กลับไปหน้าเพิ่มเติมแล้วกด “ล้างประวัติการค้นหา/สถิติในเครื่อง” ได้ทันที</div>
+  </div>`;
+}
+
+const PAGES = {
+  services: pageServices, times: pageTimes, cards: pageCards,
+  demoMode: pageDemoMode, judgeSummary: pageJudgeSummary,
+  presetTrips: pagePresetTrips, firstRideHub: pageFirstRideHub,
+  fare20: pageFare20, faq: pageFAQ, stationGuide: pageStationGuide,
+  accessibility: pageAccessibility, rules: pageRules, fareCompare: pageFareCompare,
+  news: pageNews, promos: pagePromos,
+  announcements: pageAnnouncements, serviceNotice: pageServiceNotice, incidentFeed: pageIncidentFeed,
+  officialLinks: pageOfficialLinks, mrtaMode: pageMRTA, more: pageMore,
+  dataStatus: pageDataStatus, dataSources: pageDataSources, contact: pageContact, privacy: pagePrivacy,
+};
+
+// ── engine ───────────────────────────────────────────────────────────
+let current = null;
+
+export function showPage(name) {
+  current = name;
+  if (!name) {
+    pageEl.hidden = true;
+    setActiveTab('map');
+    return;
+  }
+  pageEl.innerHTML = `<div class="pg-inner">${PAGES[name]()}</div>`;
+  pageEl.hidden = false;
+  pageEl.scrollTop = 0;
+  setActiveTab(['services', 'times', 'cards', 'fare20', 'faq', 'stationGuide', 'accessibility', 'rules', 'fareCompare', 'presetTrips', 'firstRideHub'].includes(name) ? 'services'
+    : ['news', 'promos', 'announcements', 'serviceNotice', 'incidentFeed', 'officialLinks'].includes(name) ? 'news' : 'more');
+  wireActions();
+}
+
+function setActiveTab(tab) {
+  tabbar?.querySelectorAll('.tb-item').forEach(b =>
+    b.classList.toggle('on', b.dataset.tab === tab));
+}
+
+function wireActions() {
+  pageEl.querySelectorAll('[data-act]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const act = btn.dataset.act;
+      if (PAGES[act]) return showPage(act);
+      showPage(null);
+      if (act.startsWith('preset:')) {
+        const [from, to] = act.slice(7).split('|');
+        ctx.planTrip(from, to);
+        return;
+      }
+      if (act.startsWith('mission:')) {
+        const [from, to] = act.slice(8).split('|');
+        ctx.planTrip(from, to);
+        ctx.startFirstRide();
+        return;
+      }
+      switch (act) {
+        case 'fares': ctx.focusSearch(); break;
+        case 'firstride': ctx.startFirstRide(); break;
+        case 'runDemo': ctx.runDemo(); break;
+        case 'stats': ctx.openStats(); break;
+        case 'exits': ctx.hintExits(); break;
+        case 'activateMRTA': ctx.activateMRTA(); break;
+        case 'theme': ctx.toggleTheme(); break;
+        case 'big': ctx.toggleBig(); break;
+        case 'about': ctx.openAbout(); break;
+        case 'onboard': ctx.openOnboard(); break;
+        case 'clear':
+          try {
+            ['bkk3d_recents', 'bkk3d_co2', 'bkk3d_seen'].forEach(k => localStorage.removeItem(k));
+          } catch {}
+          alert('ล้างข้อมูลในเครื่องแล้ว');
+          break;
+      }
+    });
+  });
+}
+
+export function initPages(context) {
+  ctx = context;
+  pageEl = document.getElementById('page');
+  tabbar = document.getElementById('tabbar');
+  tabbar.querySelectorAll('.tb-item').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const t = btn.dataset.tab;
+      showPage(t === 'map' ? null : t === 'services' ? 'services'
+        : t === 'news' ? 'news' : 'more');
+    });
+  });
+  return { showPage };
+}

@@ -1,0 +1,13 @@
+{
+  "name": "กรุงเทพฯ Transit 3D — แผนที่รถไฟฟ้า 3 มิติ",
+  "short_name": "BKK Transit 3D",
+  "description": "วางแผนเดินทางรถไฟฟ้ากรุงเทพ 10 สาย 193 สถานี บนแผนที่ 3 มิติ พร้อมค่าโดยสารจริง",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#dfe9f2",
+  "theme_color": "#dfe9f2",
+  "lang": "th",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

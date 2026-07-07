@@ -1,0 +1,10 @@
+# Generated deploy bundles
+*.zip
+
+# Local/system clutter
+__pycache__/
+.DS_Store
+Thumbs.db
+
+# Source PDFs used for reading the competition brief; not needed for the app
+*.pdf

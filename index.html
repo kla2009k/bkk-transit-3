@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>กรุงเทพฯ Transit 3D — แผนที่รถไฟฟ้ากรุงเทพ 3 มิติ วางแผนเดินทาง + ค่าโดยสาร</title>
+<meta name="description" content="แผนที่ 3D รถไฟฟ้ากรุงเทพครบ 10 สาย 193 สถานี จากข้อมูลจริง OpenStreetMap — วางแผนเส้นทาง เปรียบเทียบค่าโดยสาร 20 บาทตลอดสาย ดูรถไฟวิ่งตามตารางจริง นั่งมุมหัวขบวน">
+<meta property="og:title" content="กรุงเทพฯ Transit 3D — แผนที่รถไฟฟ้า 3 มิติ">
+<meta property="og:description" content="วางแผนเดินทางรถไฟฟ้ากรุงเทพบนแผนที่ 3D — 10 สาย 193 สถานี ค่าโดยสารจริง รถไฟวิ่งตาม headway จริง">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#dfe9f2">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚇</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@200;300;400;600;800&family=Sarabun:wght@300;400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three/three.module.js",
+    "three/addons/": "./vendor/three/addons/"
+  }
+}
+</script>
+</head>
+<body>
+<canvas id="scene"></canvas>
+
+<header class="hud hud-title">
+  <div class="th">กรุงเทพฯ</div>
+  <div class="en">BANGKOK&nbsp;TRANSIT&nbsp;<span class="thin">3D</span></div>
+  <div class="sub">โครงข่ายรถไฟฟ้า · ข้อมูลจริงจาก OpenStreetMap</div>
+</header>
+
+<!-- primary action: route search, front and center -->
+<section class="hud hud-search" id="searchbar">
+  <div class="sb-sum" id="sb-sum">🔍 ค้นหาเส้นทาง…</div>
+  <div class="sb-row">
+    <span class="sb-dot sb-from"></span>
+    <input id="from-input" list="station-list" placeholder="จากสถานี…" autocomplete="off">
+    <button id="geo-btn" title="สถานีใกล้ฉัน">📍</button>
+  </div>
+  <div class="sb-row">
+    <span class="sb-dot sb-to"></span>
+    <input id="to-input" list="station-list" placeholder="ไปสถานี…" autocomplete="off">
+    <button id="swap-btn" title="สลับต้นทาง-ปลายทาง">⇅</button>
+  </div>
+  <div class="sb-recents" id="recents"></div>
+</section>
+<datalist id="station-list"></datalist>
+
+<!-- station action sheet (click a station) -->
+<div class="hud hud-sheet" id="sheet" hidden>
+  <div class="sh-head">
+    <span class="sh-code" id="sh-code"></span>
+    <div>
+      <div class="sh-name" id="sh-name"></div>
+      <div class="sh-sub" id="sh-sub"></div>
+    </div>
+    <button class="sh-x" id="sh-close">✕</button>
+  </div>
+  <div class="sh-info" id="sh-info"></div>
+  <div class="sh-actions">
+    <button id="sh-from">○ ต้นทาง</button>
+    <button id="sh-to">● ปลายทาง</button>
+  </div>
+</div>
+
+<!-- first-visit onboarding -->
+<div id="onboard" hidden>
+  <div class="ob-card">
+    <div class="ob-title">🚇 กรุงเทพฯ Transit 3D</div>
+    <ul>
+      <li>🔍 พิมพ์ <b>จาก → ไป</b> ด้านบน หรือแตะ 2 สถานีบนแผนที่ = เส้นทาง + ราคา</li>
+      <li>🚆 แตะขบวนรถไฟ = กล้องตามขบวน (กด <b>C</b> นั่งหัวขบวน)</li>
+      <li>🕐 แถบเวลาด้านล่าง = ดูรถทั้งวัน เช้ามืดยันเที่ยงคืน</li>
+    </ul>
+    <button id="ob-first">🎓 ไม่เคยนั่งรถไฟฟ้า? ซ้อมเที่ยวแรกกับเรา (3 นาที)</button>
+    <button id="ob-go">เริ่มใช้เลย</button>
+  </div>
+</div>
+
+<aside class="hud hud-panel" id="panel">
+  <div class="stats" id="stats">— สาย · — สถานี</div>
+  <div class="legend" id="legend"></div>
+  <button id="rider-btn">📊 ผู้โดยสารรายเดือน</button>
+  <div id="rider-panel" hidden></div>
+  <div class="hint">คลิกสายเพื่อเปิด/ปิด · ดับเบิลคลิก = ดูสายเดียว<br>
+  <span class="credit">© OpenStreetMap contributors (ODbL)</span></div>
+</aside>
+
+<div class="hud hud-card" id="card" hidden>
+  <div class="card-line" id="card-line"></div>
+  <div class="card-th" id="card-th"></div>
+  <div class="card-en" id="card-en"></div>
+</div>
+
+<footer class="hud hud-help">ลากเพื่อหมุน · เลื่อนเพื่อซูม · ชี้สถานีเพื่อดูชื่อ · คลิก 2 สถานีเพื่อวางแผนเดินทาง</footer>
+
+<button class="hud hud-toggle" id="theme-toggle" title="สลับกลางวัน/กลางคืน">🌙</button>
+<button class="hud hud-toggle hud-toggle2" id="big-btn" title="โหมดตัวหนังสือใหญ่">🔎</button>
+<button class="hud hud-toggle hud-toggle3" id="about-btn" title="เกี่ยวกับ + ที่มาข้อมูล">ℹ️</button>
+<button class="hud hud-toggle hud-toggle4" id="home-btn" title="กลับมุมมองเริ่มต้น">🧭</button>
+<button class="hud hud-toggle hud-tools" id="tools-btn" title="เครื่องมือ">⋯</button>
+
+<div id="about" hidden>
+  <div class="ob-card ab-card">
+    <div class="ob-title">🚇 กรุงเทพฯ Transit 3D</div>
+    <p class="ab-lead">แผนที่ 3 มิติมีชีวิตของระบบรถไฟฟ้ากรุงเทพฯ ครบ 10 สาย 193 สถานี —
+    วางแผนเดินทาง เห็นราคาก่อนออกจากบ้าน และ "ซ้อมเดินทาง" ได้เหมือนไปมาแล้ว</p>
+    <div class="ab-sec">🏆 Why MRTA should care</div>
+    <p class="ab-body">โปรเจกต์นี้ลด friction ก่อนผู้โดยสารขึ้นระบบรางจริง: ไม่รู้ขึ้นสายไหน,
+    กลัวเปลี่ยนสาย, ไม่แน่ใจค่าโดยสาร, และกังวลเรื่องทางออก/ลิฟต์ — ทั้งหมดถูกแปลงเป็น
+    route card, 3D preview, First Ride Simulator, MRTA Mode และหน้าที่มาข้อมูลที่ตรวจสอบได้</p>
+    <div class="ab-sec">🎬 What judges should try</div>
+    <p class="ab-body">กด <b>เพิ่มเติม → Demo Mode</b> เพื่อเปิดโหมดกรรมการ: spotlight สาย รฟม.,
+    วางเส้นทางตัวอย่าง, เทียบสิทธิ 20 บาทกับราคาปกติ และต่อด้วยซ้อมเดินทางแบบ 3D</p>
+    <div class="ab-sec">🚀 Next version</div>
+    <p class="ab-body">ต่อ official incident feed, API ค่าโดยสาร/เวลาเดินรถ, accessibility dataset
+    ที่ครบทุกสถานี, notification เฉพาะสายที่ผู้ใช้บันทึกไว้ และ route planning ที่หลีกเลี่ยงบันไดได้</p>
+    <div class="ab-sec">📊 ที่มาข้อมูล (ทั้งหมดคือข้อมูลเปิด)</div>
+    <ul class="ab-list">
+      <li><b>เส้นทาง · สถานี · อาคาร · ทางออก</b> — © OpenStreetMap contributors (ODbL)</li>
+      <li><b>ค่าโดยสารทางการ 6,953 คู่สถานี</b> — Open Data กรมการขนส่งทางราง (เม.ย. 2569)</li>
+      <li><b>ผู้โดยสารรายเดือน</b> — Open Data กรมการขนส่งทางราง (มี.ค. 2569)</li>
+      <li><b>ความถี่ขบวน · เวลาเปิด-ปิด</b> — ประมาณจากข้อมูลเผยแพร่ของผู้ให้บริการ</li>
+      <li><b>นโยบาย 20 บาทตลอดสาย</b> — เงื่อนไขทางการ ใช้ได้ถึง 30 ก.ย. 2569</li>
+    </ul>
+    <div class="ab-sec">🌱 ผลกระทบที่เป็นไปได้</div>
+    <p class="ab-body">ระบบรางกรุงเทพฯ มีผู้โดยสารรวม <b>&gt;40 ล้านเที่ยว/เดือน</b> —
+    ถ้าเครื่องมือนี้ช่วยให้คนเปลี่ยนจากรถยนต์มาใช้รางเพิ่มเพียง <b>0.1%</b>
+    (~40,000 เที่ยว/เดือน) จะลด CO₂ ได้ราว <b>50-70 ตัน/เดือน</b>
+    (คิดจากส่วนต่าง ~125 gCO₂e ต่อผู้โดยสาร-กม. · ประมาณการ)</p>
+    <div class="ab-sec">☀️ พลังงานสะอาดของ รฟม.</div>
+    <p class="ab-body">รฟม. ติดตั้ง <b>Solar Rooftop 17 MWp</b> ในระบบของตัวเอง
+    ลดการใช้ไฟฟอสซิล ~21.27 ล้านหน่วย/ปี = ลด CO₂ <b>11,900 ตัน/ปี</b>
+    (เทียบเท่าปลูกต้นไม้ 680,000 ต้น) — ทุกเที่ยวที่ย้ายมานั่ง MRT
+    คือการเดินทางด้วยพลังงานที่สะอาดขึ้นเรื่อยๆ สอดคล้องเป้าหมายประเทศ
+    <b>Carbon Neutrality 2050</b></p>
+    <div class="ab-sec">⚠️ ข้อจำกัด</div>
+    <p class="ab-body">ไม่ใช่แอปทางการของผู้ให้บริการ · ราคา/เวลาเป็นข้อมูล ณ วันที่ระบุ
+    ควรตรวจสอบก่อนเดินทาง · ข้อมูลทางออกจาก OSM ยังไม่ครบทุกสถานี (ระบุตรงๆ ในจุดที่ขาด)</p>
+    <button id="ab-install" hidden>📲 ติดตั้งเป็นแอปบนเครื่อง</button>
+    <button id="ab-close">ปิด</button>
+  </div>
+</div>
+
+<section class="hud hud-time" id="timebar">
+  <button id="time-live" title="ตามเวลาจริง">สด</button>
+  <input type="range" id="time-slider" min="0" max="24" step="0.25" value="7.5">
+  <span id="time-label">07:30 · ชั่วโมงเร่งด่วน</span>
+  <button id="time-play" title="เดินเวลาอัตโนมัติ">▶</button>
+</section>
+
+<div class="hud hud-chase" id="chase" hidden>
+  <span id="chase-label">🚆</span>
+  <button id="chase-cab">มุมหัวขบวน (C)</button>
+  <button id="chase-exit" title="ออก (Esc)">✕</button>
+</div>
+
+<div class="hud hud-chase" id="tour-banner" hidden>
+  <span id="tour-text">🚆</span>
+  <button id="tour-exit">✕ ออก</button>
+</div>
+
+<section class="hud hud-route" id="route">
+  <div class="rt-head">
+    <span>วางแผนเดินทาง</span>
+    <button id="route-clear" title="ล้าง (Esc)">✕</button>
+  </div>
+  <div id="route-body"><span class="muted">คลิกสถานีต้นทาง แล้วคลิกสถานีปลายทาง</span></div>
+</section>
+
+<!-- app-style pages + bottom tabs -->
+<div id="page" hidden></div>
+<nav id="tabbar">
+  <button class="tb-item on" data-tab="map">🗺️<span>แผนที่</span></button>
+  <button class="tb-item" data-tab="services">🎫<span>บริการ</span></button>
+  <button class="tb-item" data-tab="news">📰<span>ข่าวสาร</span></button>
+  <button class="tb-item" data-tab="more">☰<span>เพิ่มเติม</span></button>
+</nav>
+
+<div id="loader"><div class="ring"></div><div class="txt">กำลังโหลดโครงข่าย…</div></div>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
