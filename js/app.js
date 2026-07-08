@@ -811,7 +811,7 @@ const themeBtn = document.getElementById('theme-toggle');
 themeBtn.textContent = DAY ? '🌙' : '☀️';
 themeBtn.addEventListener('click', () => {
   const p = new URLSearchParams(location.search);
-  if (DAY) p.set('night', ''); else p.delete('night');
+  if (DAY) p.delete('day'); else p.set('day', '');
   location.search = p.toString();
 });
 

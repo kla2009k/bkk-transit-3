@@ -1,6 +1,6 @@
-// theme.js — day (default, "morning map" readability) vs night (neon cinematic).
+// theme.js — night (default, neon cinematic) vs day ("morning map" readability).
 // Shared by app.js and city.js so both pick matching palettes.
-export const DAY = !new URLSearchParams(location.search).has('night');
+export const DAY = new URLSearchParams(location.search).has('day');
 
 export const T = DAY ? {
   // ── morning ──
