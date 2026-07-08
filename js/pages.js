@@ -55,6 +55,23 @@ const DATA_BADGES = [
   ['Open Map', 'เส้นทาง สถานี อาคาร และทางออกจาก OpenStreetMap'],
   ['Estimated', 'เวลาเดินรถ ความหนาแน่น และ CO₂ เป็นค่าประมาณ มี label ชัดเจน'],
   ['Local Only', 'ประวัติ route และ CO₂ สะสมอยู่ใน browser ของผู้ใช้เท่านั้น'],
+  ['Future AI Model', 'crowd prediction เป็น roadmap ต้องใช้ข้อมูลทางการ/นิรนาม ไม่ใช่ข้อมูลสดใน prototype'],
+];
+
+const CROWD_SCENARIOS = [
+  ['สุขุมวิท', '08:10', 'สูง', 'จุดเปลี่ยนสาย + ช่วงเข้างาน + สถานี office district'],
+  ['ศูนย์วัฒนธรรมฯ', '18:25', 'สูง', 'ช่วงเลิกงาน + เชื่อมต่อกิจกรรม/ห้าง/เส้นทางหลัก'],
+  ['เตาปูน', '17:45', 'กลาง', 'จุดเชื่อมสีน้ำเงิน/ม่วง แต่กระจายผู้โดยสารได้หลายทิศทาง'],
+  ['บางซื่อ', '07:30', 'กลาง', 'เชื่อมระบบรางหลายรูปแบบ ต้องเผื่อเวลาต่อระบบ'],
+  ['ท่าพระ', '10:30', 'ต่ำ', 'นอก rush hour เหมาะกับผู้ใช้ใหม่หรือผู้สูงอายุ'],
+];
+
+const AI_ROADMAP = [
+  ['Phase 1', 'Pre-trip simulator', 'แผนที่ 3D + route planner + ค่าโดยสาร + First Ride ใช้งานได้ใน prototype ปัจจุบัน'],
+  ['Phase 2', 'Official data integration', 'ต่อข้อมูล incident, lift/escalator, facility, timetable และประกาศจากแหล่งทางการ'],
+  ['Phase 3', 'AI crowd prediction', 'คาดการณ์คนหนาแน่นรายสถานี/ช่วงเวลา จากเวลา วัน สถานี จุดเปลี่ยนสาย event และสภาพอากาศ'],
+  ['Phase 4', 'Inclusive mobility', 'แนะนำเส้นทางที่เหมาะกับผู้สูงอายุ ผู้ใช้ wheelchair คนมีสัมภาระ และผู้โดยสารที่ต้องการเลี่ยงความแออัด'],
+  ['Phase 5', 'Operator intelligence', 'ช่วย MRTA วางกำลังเจ้าหน้าที่ จัดการ crowd surge และปรับพลังงานตาม demand'],
 ];
 
 // ── page renderers ───────────────────────────────────────────────────
@@ -84,6 +101,7 @@ function pageServices() {
     <button class="pg-card" data-act="rules">🤝<span>มารยาท &amp;<br>ข้อควรระวัง</span></button>
     <button class="pg-card" data-act="mrtaMode">🏛️<span>MRTA<br>Mode</span></button>
     <button class="pg-card" data-act="accessibility">♿<span>Accessibility<br>Layer</span></button>
+    <button class="pg-card" data-act="aiMobility">🤖<span>AI Crowd<br>Prediction</span></button>
   </div>`;
 }
 
@@ -226,8 +244,10 @@ function pageJudgeSummary() {
     <div class="pg-item"><b>Impact</b><br>ช่วยให้คนตัดสินใจใช้ระบบรางง่ายขึ้น ลดความกลัวการเปลี่ยนสาย ดันการใช้สิทธิ 20 บาท และสื่อสาร CO₂ ที่ประหยัดได้</div>
     <div class="pg-item"><b>ต่างจากแอปทั่วไป</b><br>แอปทั่วไปบอกเส้นทาง แต่โปรเจกต์นี้ “ซ้อมการเดินทาง” ให้เห็นภาพก่อนออกจากบ้าน พร้อมข้อมูลที่อ้างอิงได้</div>
     <div class="pg-item"><b>Scalable</b><br>ต่อ official incident feed, API ค่าโดยสาร, accessibility dataset และ notification เฉพาะสายที่ผู้ใช้ใช้ประจำได้ในเวอร์ชันถัดไป</div>
+    <div class="pg-item"><b>Future AI</b><br>ต่อยอดเป็น AI Mobility Assistant ที่คาดการณ์ crowd รายสถานี/ช่วงเวลา แนะนำ route ที่คนน้อยกว่า และช่วย MRTA บริหารสถานีด้าน safety/energy</div>
   </div>
-  <button class="pg-cta" data-act="runDemo">เริ่ม flow เดโมกรรมการ</button>`;
+  <button class="pg-cta" data-act="runDemo">เริ่ม flow เดโมกรรมการ</button>
+  <button class="pg-cta pg-secondary" data-act="aiMobility">ดู AI Mobility Lab →</button>`;
 }
 
 function pagePresetTrips() {
@@ -309,7 +329,60 @@ function pageAccessibility() {
     <div class="pg-item"><b>โหมดตัวหนังสือใหญ่</b><br>เปิดได้จากหน้าเพิ่มเติมหรือปุ่ม 🔎 เพื่อให้ route card, station sheet และคำอธิบายอ่านง่ายขึ้น</div>
     <div class="pg-item"><b>ข้อจำกัดที่ต้องบอกตรง ๆ</b><br>ข้อมูล accessibility ยังไม่ครบทุกสถานี เพราะขึ้นกับ OSM/community mapping ไม่ควรใช้แทนประกาศทางการในกรณีจำเป็นสูง</div>
     <div class="pg-item"><b>เวอร์ชันถัดไป</b><br>ต่อ official accessibility dataset, ทำ filter “ต้องมีลิฟต์”, และเพิ่ม route ที่หลีกเลี่ยงบันไดเมื่อข้อมูลครบ</div>
+    <div class="pg-item"><b>เชื่อมกับ AI Crowd Prediction</b><br>เมื่อมีข้อมูลความหนาแน่นรายช่วงเวลา แอปสามารถแนะนำเวลาหรือเส้นทางที่คนน้อยกว่าให้ผู้สูงอายุ ผู้ใช้วีลแชร์ และคนที่ไม่มั่นใจกับสถานีใหญ่</div>
   </div>`;
+}
+
+function crowdClass(level) {
+  return level === 'สูง' ? 'high' : level === 'กลาง' ? 'mid' : 'low';
+}
+
+function pageAIMobility() {
+  const scenarioRows = CROWD_SCENARIOS.map(([station, time, level, reason]) =>
+    `<div class="pg-crowdrow">
+      <div><b>${esc(station)}</b><span>${esc(time)} · คาดการณ์ ${esc(level)}</span></div>
+      <em class="${crowdClass(level)}">${esc(level)}</em>
+      <small>${esc(reason)}</small>
+    </div>`).join('');
+  const roadmap = AI_ROADMAP.map(([phase, title, desc]) =>
+    `<div><b>${esc(phase)}</b><span><strong>${esc(title)}</strong><br>${esc(desc)}</span></div>`).join('');
+  return `
+  <button class="pg-back" data-act="more">← เพิ่มเติม</button>
+  <div class="pg-title">AI Mobility Lab</div>
+  <div class="pg-hero pg-aihero">
+    <div><b>จาก pre-trip simulator สู่ AI Mobility Assistant</b><br><span>คาดการณ์ความหนาแน่น แนะนำเส้นทางที่เหมาะกับผู้ใช้แต่ละกลุ่ม และช่วย MRTA บริหารสถานีในอนาคต</span></div>
+  </div>
+  <div class="pg-ai-grid">
+    <div class="pg-ai-card">
+      <b>🤖 AI Crowd Prediction</b>
+      <span>คาดการณ์คนหนาแน่นรายสถานี/ช่วงเวลา เช่น อีก 30-60 นาที สถานีไหนควรเลี่ยง หรือเส้นทางไหนคนน้อยกว่า</span>
+    </div>
+    <div class="pg-ai-card">
+      <b>♿ Smart Accessibility</b>
+      <span>แนะนำ route ที่ใช้ลิฟต์ เดินน้อย เลี่ยงสถานีแน่น และเหมาะกับผู้สูงอายุ ผู้ใช้ wheelchair หรือคนมีสัมภาระ</span>
+    </div>
+    <div class="pg-ai-card">
+      <b>🛡️ IoT Safety</b>
+      <span>ต่อยอดกับ sensor หรือ computer vision แบบไม่ระบุตัวตน เพื่อแจ้งเตือน crowd surge และพื้นที่เสี่ยง</span>
+    </div>
+    <div class="pg-ai-card">
+      <b>⚡ Energy Saving</b>
+      <span>ใช้ demand prediction ช่วยปรับแอร์ บันไดเลื่อน กำลังเจ้าหน้าที่ และการจัดการสถานีให้ประหยัดขึ้น</span>
+    </div>
+  </div>
+  <div class="pg-sec">ตัวอย่างหน้าคาดการณ์ crowd (concept)</div>
+  <div class="pg-crowdpanel">
+    ${scenarioRows}
+  </div>
+  <div class="pg-note">ข้อมูลในหน้านี้เป็น concept/roadmap สำหรับค่าย ไม่ใช่ข้อมูลความหนาแน่นสดจริง เวอร์ชัน production ต้องใช้ข้อมูลทางการ เช่น tap-in/tap-out รายเวลา, event, weather และสถานะเดินรถ</div>
+  <div class="pg-sec">โมเดลที่เหมาะสำหรับ prototype</div>
+  <div class="pg-list">
+    <div class="pg-item"><b>Baseline</b><br>เริ่มจากค่าเฉลี่ยรายสถานีตามวันและเวลา เพื่อมีจุดเปรียบเทียบที่อธิบายง่าย</div>
+    <div class="pg-item"><b>ML รุ่นแรก</b><br>ใช้ Random Forest / Gradient Boosting จาก feature เช่น ชั่วโมง วันในสัปดาห์ จุดเปลี่ยนสาย ความถี่รถ ฝนตก และ event ใกล้สถานี</div>
+    <div class="pg-item"><b>เมื่อมีข้อมูลมากขึ้น</b><br>ต่อยอดเป็น time-series หรือ graph model เพื่อดูการไหลของผู้โดยสารทั้งโครงข่าย ไม่ใช่แค่สถานีเดียว</div>
+  </div>
+  <div class="pg-sec">Roadmap ต่อจากเว็บนี้</div>
+  <div class="pg-timeline pg-roadmap">${roadmap}</div>`;
 }
 
 function pageRules() {
@@ -458,6 +531,7 @@ function pageMore() {
     <button class="pg-item pg-row" data-act="about">ℹ️ เกี่ยวกับแอป + ที่มาข้อมูล + ผลกระทบ <span>›</span></button>
     <button class="pg-item pg-row" data-act="dataSources">📚 ที่มาข้อมูลแบบละเอียด <span>›</span></button>
     <button class="pg-item pg-row" data-act="dataStatus">🏷️ สถานะข้อมูล / data labels <span>›</span></button>
+    <button class="pg-item pg-row" data-act="aiMobility">🤖 AI Mobility Lab / Crowd Prediction <span>›</span></button>
     <button class="pg-item pg-row" data-act="accessibility">♿ Accessibility Layer <span>›</span></button>
     <button class="pg-item pg-row" data-act="incidentFeed">🚧 Incident Feed roadmap <span>›</span></button>
     <button class="pg-item pg-row" data-act="fareCompare">⚖️ เทียบค่าโดยสาร 20฿ vs ปกติ <span>›</span></button>
@@ -478,6 +552,7 @@ function pageDataStatus() {
   <div class="pg-grid pg-badgegrid">${badges}</div>
   <div class="pg-list">
     <div class="pg-item"><b>ทำไมต้องแยก label</b><br>ข้อมูลบางอย่างเป็น official/open data แต่บางอย่างเป็นค่าประมาณเพื่อ simulation การแยก label ทำให้กรรมการเห็นว่าทีมไม่มั่วข้อมูล</div>
+    <div class="pg-item"><b>AI ต้องใช้ข้อมูลแบบไหน</b><br>crowd prediction เวอร์ชันจริงควรใช้ข้อมูลนิรนาม เช่น tap-in/tap-out รายช่วงเวลา สถานะเดินรถ event และสภาพอากาศ โดยไม่เก็บใบหน้าหรือข้อมูลส่วนบุคคล</div>
     <div class="pg-item"><b>ใช้ใน pitch</b><br>บอกว่าแอปนี้ตั้งใจ “โปร่งใสเรื่องข้อมูล” ตั้งแต่ prototype ไม่รอให้เป็น production ก่อน</div>
   </div>`;
 }
@@ -490,6 +565,7 @@ function pageDataSources() {
     ['ความถี่และเวลาเปิด-ปิด', 'ข้อมูลเผยแพร่ของผู้ให้บริการ + service.js', 'ประมาณ 2025-2026', 'ใช้จำลองขบวนและตารางเวลาระดับสาย'],
     ['นโยบาย 20 บาท', 'ประกาศภาครัฐ/รฟม. ตามเงื่อนไขปัจจุบัน', 'ใช้ได้ถึง 30 ก.ย. 2569', 'ใช้เปรียบเทียบค่าโดยสารและ route card'],
     ['CO₂ ที่ประหยัดได้', 'ค่าประมาณ emission factor สาธารณะ', 'ประมาณการ', 'ใช้สื่อสารผลกระทบเชิงสิ่งแวดล้อม'],
+    ['Crowd prediction', 'ต้องใช้ข้อมูลทางการ/นิรนามในอนาคต', 'roadmap', 'ใช้แนะนำเวลา/เส้นทางที่เหมาะกับผู้ใช้แต่ละกลุ่ม'],
   ].map(([topic, source, date, use]) =>
     `<tr><td>${topic}</td><td>${source}</td><td>${date}</td><td>${use}</td></tr>`).join('');
   return `
@@ -533,7 +609,7 @@ const PAGES = {
   demoMode: pageDemoMode, judgeSummary: pageJudgeSummary,
   presetTrips: pagePresetTrips, firstRideHub: pageFirstRideHub,
   fare20: pageFare20, faq: pageFAQ, stationGuide: pageStationGuide,
-  accessibility: pageAccessibility, rules: pageRules, fareCompare: pageFareCompare,
+  accessibility: pageAccessibility, aiMobility: pageAIMobility, rules: pageRules, fareCompare: pageFareCompare,
   news: pageNews, promos: pagePromos,
   announcements: pageAnnouncements, serviceNotice: pageServiceNotice, incidentFeed: pageIncidentFeed,
   officialLinks: pageOfficialLinks, mrtaMode: pageMRTA, more: pageMore,
@@ -553,7 +629,7 @@ export function showPage(name) {
   pageEl.innerHTML = `<div class="pg-inner">${PAGES[name]()}</div>`;
   pageEl.hidden = false;
   pageEl.scrollTop = 0;
-  setActiveTab(['services', 'times', 'cards', 'fare20', 'faq', 'stationGuide', 'accessibility', 'rules', 'fareCompare', 'presetTrips', 'firstRideHub'].includes(name) ? 'services'
+  setActiveTab(['services', 'times', 'cards', 'fare20', 'faq', 'stationGuide', 'accessibility', 'aiMobility', 'rules', 'fareCompare', 'presetTrips', 'firstRideHub'].includes(name) ? 'services'
     : ['news', 'promos', 'announcements', 'serviceNotice', 'incidentFeed', 'officialLinks'].includes(name) ? 'news' : 'more');
   wireActions();
 }
