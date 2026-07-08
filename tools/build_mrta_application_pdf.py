@@ -27,7 +27,7 @@ OUT = ROOT / "mrta_camp" / "Bangkok_Transit_3D_MRTA_Application.pdf"
 PROJECT_NAME = "Bangkok Transit 3D"
 TEAM_NAME = "ทีม Bangkok Transit 3D"
 SCHOOL_NAME = "ผลงานประกอบการสมัครโดยผู้สมัครระดับนักเรียน/นักศึกษา"
-DEMO_URL = "https://kla2009k.github.io/bkk-transit-3d/"
+DEMO_URL = "https://kla2009k.github.io/bkk-transit-3/"
 
 FONT = "Tahoma"
 FONT_BOLD = "Tahoma-Bold"
