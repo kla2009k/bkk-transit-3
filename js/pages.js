@@ -543,32 +543,98 @@ function pageSafetyGuide() {
   <div class="pg-note">หน้านี้ไม่แทนที่ประกาศความปลอดภัยของสถานี แต่ช่วยผู้โดยสารใหม่รู้ว่าควรทำอะไรเมื่อเกิดเหตุที่พบบ่อย</div>`;
 }
 
-const COPILOT_ANSWERS = {
-  first: 'ถ้าใช้รถไฟฟ้าครั้งแรก ให้เริ่มจากค้นต้นทาง-ปลายทาง ดูสายที่ต้องขึ้นและสถานีเปลี่ยนสาย จากนั้นกด First Ride เพื่อซ้อมขั้นตอนซื้อตั๋ว แตะบัตร เลือกชานชาลา และออกสถานี',
-  fare: 'สิทธิ 20 บาทต้องลงทะเบียนบัตรผ่านแอปทางรัฐ และเปลี่ยนสายภายในเงื่อนไขเวลา แอปนี้ช่วยเทียบกับราคาปกติของ route เพื่อให้เห็นว่าประหยัดเท่าไหร่',
-  crowd: 'เวอร์ชันนี้ยังไม่ใช่ crowd สด แต่ AI Mobility Lab วางแผนใช้เวลา วัน จุดเปลี่ยนสาย event weather และ tap-in/out แบบนิรนาม เพื่อคาดการณ์ความหนาแน่นในอนาคต',
-  access: 'สำหรับผู้สูงอายุหรือ wheelchair ให้ดู Accessibility Layer และในอนาคต route goals จะเลือกเส้นทางที่เดินน้อย มีลิฟต์ และเลี่ยงสถานีแน่นได้',
-  lost: 'ถ้าหลงหรือขึ้นผิดฝั่ง ให้หยุดดูป้ายปลายทาง ถามเจ้าหน้าที่ และอย่าเข้าเขตห้าม ถ้าของหายให้จำสาย สถานี เวลา และทิศทางขบวนแล้วติดต่อช่องทางทางการ',
-};
+const GEMINI_MODEL = 'gemini-3.5-flash';
+const GEMINI_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/interactions';
+let copilotPreviousId = null;
+
+const COPILOT_SYSTEM = `คุณคือ Transit AI Copilot ของเว็บ Bangkok Transit 3D สำหรับ MRTA Innovation Camp 2026
+ตอบเป็นภาษาไทย กระชับ ชัดเจน เป็นมิตรกับผู้โดยสารใหม่ โดยเฉพาะคนต่างจังหวัด ผู้สูงอายุ นักท่องเที่ยว และผู้ใช้ wheelchair
+บริบทของแอป: แผนที่รถไฟฟ้า 3D, route planner, ค่าโดยสาร 20 บาทเทียบราคาปกติ, เวลาและความถี่รถ, First Ride Simulator, MRTA Mode, AI Mobility Lab, Accessibility Layer, Data Trust
+ข้อจำกัดสำคัญ: ห้ามอ้างว่ามีข้อมูล real-time ถ้าไม่มี ห้ามแต่ง incident/โปรโมชัน/ค่าโดยสารสด ให้แนะนำให้ตรวจเว็บทางการเมื่อเป็นข้อมูลสำคัญ
+ถ้าถามเรื่อง AI crowd prediction ให้บอกว่าเป็น roadmap/concept ที่ต้องใช้ข้อมูลทางการแบบนิรนาม เช่น tap-in/tap-out รายเวลา, event, weather, จุดเปลี่ยนสาย และสถานะเดินรถ
+ถ้าถามเรื่องความปลอดภัยหรือฉุกเฉิน ให้แนะนำติดต่อเจ้าหน้าที่สถานีหรือช่องทางทางการทันที`;
+
+function getGeminiKey() {
+  try { return localStorage.getItem('bkk3d_gemini_key') || ''; } catch { return ''; }
+}
+
+function setGeminiKey(key) {
+  try {
+    if (key) localStorage.setItem('bkk3d_gemini_key', key);
+    else localStorage.removeItem('bkk3d_gemini_key');
+  } catch {}
+}
+
+function extractGeminiText(data) {
+  if (data?.output_text) return data.output_text;
+  const texts = [];
+  for (const step of data?.steps || []) {
+    const parts = step?.output || step?.content || step?.parts || [];
+    for (const part of Array.isArray(parts) ? parts : [parts]) {
+      if (typeof part?.text === 'string') texts.push(part.text);
+      if (part?.type === 'text' && typeof part?.text === 'string') texts.push(part.text);
+    }
+  }
+  return texts.join('\n').trim();
+}
+
+async function askGemini(input) {
+  const key = getGeminiKey();
+  if (!key) throw new Error('ยังไม่ได้ใส่ Gemini API key');
+  const payload = {
+    model: GEMINI_MODEL,
+    system_instruction: COPILOT_SYSTEM,
+    input,
+    generation_config: { temperature: 0.35, thinking_level: 'low' },
+  };
+  if (copilotPreviousId) payload.previous_interaction_id = copilotPreviousId;
+  const res = await fetch(GEMINI_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-goog-api-key': key,
+    },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg = data?.error?.message || `Gemini API error ${res.status}`;
+    throw new Error(msg);
+  }
+  if (data?.id) copilotPreviousId = data.id;
+  return extractGeminiText(data) || 'Gemini ไม่ได้ส่งข้อความกลับมา ลองถามใหม่อีกครั้ง';
+}
 
 function pageTransitCopilot() {
   return `
   <button class="pg-back" data-act="more">← เพิ่มเติม</button>
   <div class="pg-title">Transit AI Copilot</div>
   <div class="pg-hero">
-    <div><b>ผู้ช่วยถาม-ตอบสำหรับผู้โดยสารใหม่</b><br><span>Prototype นี้ตอบจาก rule/local content ก่อน เวอร์ชันจริงต่อ LLM ผ่าน backend ได้โดยไม่ฝัง API key ในเว็บ</span></div>
+    <div><b>Gemini-powered assistant สำหรับผู้โดยสารใหม่</b><br><span>ถามเรื่องเส้นทาง ค่าโดยสาร การเปลี่ยนสาย accessibility หรือ AI crowd prediction ได้ทันที</span></div>
+  </div>
+  <div class="pg-keybox">
+    <label for="gemini-key"><b>Gemini API key</b><span>เก็บเฉพาะใน browser เครื่องนี้ · ไม่ถูก commit ลง GitHub</span></label>
+    <div>
+      <input id="gemini-key" type="password" autocomplete="off" placeholder="ใส่ API key จาก Google AI Studio">
+      <button class="pg-mini" data-act="saveGeminiKey">บันทึก</button>
+      <button class="pg-mini pg-secondary" data-act="clearGeminiKey">ล้าง</button>
+    </div>
   </div>
   <div class="pg-chatlog" aria-live="polite">
-    <div class="pg-bubble bot"><b>Copilot</b><br>ลองเลือกคำถามด้านล่างได้เลย ผมจะตอบแบบผู้ช่วยเดินทางสำหรับคนที่ไม่คุ้นระบบราง</div>
+    <div class="pg-bubble bot"><b>Copilot</b><br>ใส่ Gemini API key แล้วถามได้เลย ผมจะตอบโดยยึดข้อมูลในโปรเจกต์นี้และจะไม่อ้างว่าเป็นข้อมูลสดถ้าไม่มีแหล่งทางการ</div>
   </div>
+  <form class="pg-chatbox" id="copilot-form">
+    <textarea id="copilot-input" rows="3" placeholder="เช่น จากสยามไปท่าพระควรระวังอะไร? หรือ AI crowd prediction ช่วยผู้สูงอายุยังไง?"></textarea>
+    <button class="pg-cta" type="submit">ถาม Gemini</button>
+  </form>
   <div class="pg-chipgrid">
-    <button class="pg-chip" data-act="ask:first">ขึ้นครั้งแรกต้องทำยังไง?</button>
-    <button class="pg-chip" data-act="ask:fare">20 บาทใช้ยังไง?</button>
-    <button class="pg-chip" data-act="ask:crowd">AI crowd prediction คืออะไร?</button>
-    <button class="pg-chip" data-act="ask:access">อยากเดินน้อย/ใช้ลิฟต์</button>
-    <button class="pg-chip" data-act="ask:lost">หลง/ของหายทำไง?</button>
+    <button class="pg-chip" data-prompt="ใช้รถไฟฟ้ากรุงเทพฯ ครั้งแรกต้องเริ่มยังไงแบบไม่หลง?">ขึ้นครั้งแรก</button>
+    <button class="pg-chip" data-prompt="ช่วยอธิบายสิทธิ 20 บาทตลอดสายแบบผู้โดยสารใหม่เข้าใจง่าย">20 บาท</button>
+    <button class="pg-chip" data-prompt="AI crowd prediction ใน Bangkok Transit 3D ช่วยผู้โดยสารและ MRTA ได้อย่างไร?">AI crowd</button>
+    <button class="pg-chip" data-prompt="ถ้าผู้สูงอายุหรือผู้ใช้ wheelchair ต้องการเดินน้อยและเลี่ยงสถานีแน่น ควรใช้ฟีเจอร์ไหน?">Accessibility</button>
+    <button class="pg-chip" data-prompt="ถ้าหลงในสถานี ขึ้นผิดฝั่ง หรือทำของหาย ควรทำอย่างไร?">Safety</button>
   </div>
-  <div class="pg-note">เหตุผลที่ยังไม่ต่อ LLM จริงใน GitHub Pages: public frontend ไม่ควรเก็บ API key และข้อมูลผู้ใช้ควรผ่าน backend ที่ควบคุม privacy/logging ได้</div>`;
+  <div class="pg-note">สำหรับ production ควรย้าย API key ไป backend/serverless proxy เพื่อควบคุม quota, logging, privacy และ safety policy ไม่ควรฝัง key ส่วนกลางใน frontend public</div>`;
 }
 
 function pageRules() {
@@ -838,16 +904,18 @@ function wireActions() {
     btn.addEventListener('click', () => {
       const act = btn.dataset.act;
       if (PAGES[act]) return showPage(act);
-      if (act.startsWith('ask:')) {
-        const key = act.slice(4);
-        const log = pageEl.querySelector('.pg-chatlog');
-        const label = btn.textContent.trim();
-        const answer = COPILOT_ANSWERS[key] || 'ยังไม่มีคำตอบสำหรับคำถามนี้ใน prototype แต่เวอร์ชัน LLM จริงสามารถค้นจากข้อมูลทางการและบริบทเส้นทางของผู้ใช้ได้';
-        if (log) {
-          log.insertAdjacentHTML('beforeend',
-            `<div class="pg-bubble user">${esc(label)}</div><div class="pg-bubble bot"><b>Copilot</b><br>${esc(answer)}</div>`);
-          log.scrollTop = log.scrollHeight;
-        }
+      if (act === 'saveGeminiKey') {
+        const input = pageEl.querySelector('#gemini-key');
+        setGeminiKey(input?.value?.trim() || '');
+        alert(input?.value?.trim() ? 'บันทึก Gemini API key ในเครื่องนี้แล้ว' : 'ยังไม่ได้ใส่ API key');
+        return;
+      }
+      if (act === 'clearGeminiKey') {
+        setGeminiKey('');
+        copilotPreviousId = null;
+        const input = pageEl.querySelector('#gemini-key');
+        if (input) input.value = '';
+        alert('ล้าง Gemini API key จากเครื่องนี้แล้ว');
         return;
       }
       showPage(null);
@@ -880,6 +948,51 @@ function wireActions() {
           alert('ล้างข้อมูลในเครื่องแล้ว');
           break;
       }
+    });
+  });
+  wireCopilot();
+}
+
+function appendBubble(kind, html) {
+  const log = pageEl.querySelector('.pg-chatlog');
+  if (!log) return null;
+  const el = document.createElement('div');
+  el.className = `pg-bubble ${kind}`;
+  el.innerHTML = html;
+  log.appendChild(el);
+  log.scrollTop = log.scrollHeight;
+  return el;
+}
+
+async function submitCopilot(rawQuestion) {
+  const question = rawQuestion.trim();
+  if (!question) return;
+  appendBubble('user', esc(question));
+  const pending = appendBubble('bot', '<b>Copilot</b><br>กำลังถาม Gemini...');
+  try {
+    const answer = await askGemini(question);
+    if (pending) pending.innerHTML = `<b>Copilot</b><br>${esc(answer).replace(/\n/g, '<br>')}`;
+  } catch (err) {
+    if (pending) pending.innerHTML = `<b>Copilot</b><br>ยังตอบด้วย Gemini ไม่ได้: ${esc(err.message)}<br><span class="pg-note">เช็ก API key, quota, internet หรือ CORS/permission ของ key ใน Google AI Studio</span>`;
+  }
+}
+
+function wireCopilot() {
+  const form = pageEl.querySelector('#copilot-form');
+  if (!form) return;
+  const keyInput = pageEl.querySelector('#gemini-key');
+  if (keyInput) keyInput.value = getGeminiKey();
+  const input = pageEl.querySelector('#copilot-input');
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const q = input?.value || '';
+    if (input) input.value = '';
+    submitCopilot(q);
+  });
+  pageEl.querySelectorAll('[data-prompt]').forEach(chip => {
+    chip.addEventListener('click', () => {
+      if (input) input.value = chip.dataset.prompt || '';
+      submitCopilot(chip.dataset.prompt || '');
     });
   });
 }

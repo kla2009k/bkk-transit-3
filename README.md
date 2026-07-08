@@ -23,7 +23,7 @@ Interactive 3D visualization of Bangkok's entire rail transit network (BTS · MR
 - Hover a station → Thai/English name card
 - Legend: click to toggle a line, double-click to isolate it
 - `?snap` — skip intro (for screenshots/embeds)
-- Fully offline — Three.js vendored locally, no CDN at runtime (fonts via Google Fonts are the only external fetch)
+- Static/PWA-friendly — Three.js vendored locally, no CDN for the 3D app shell (Google Fonts and optional Gemini Copilot API are the only external fetches)
 
 ## Run
 ```powershell

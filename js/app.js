@@ -1628,7 +1628,7 @@ async function boot() {
   }
 
   // app-style tab pages (บริการ/ข่าวสาร/เพิ่มเติม)
-  initPages({
+  const pages = initPages({
     lines: data.lines.map(l => ({ id: l.id, name_th: l.name_th, name_en: l.name_en, color: l.color })),
     headwayFor, serviceHours,
     fareSummary: () => routeFareSummary(),
@@ -1654,6 +1654,7 @@ async function boot() {
     openAbout: () => { document.getElementById('about').hidden = false; },
     openOnboard: () => { document.getElementById('onboard').hidden = false; },
   });
+  document.getElementById('copilot-fab')?.addEventListener('click', () => pages.showPage('transitCopilot'));
 
   // ?chase=lineId[,cab] — auto-follow first train (demo/verification)
   const chaseQ = new URLSearchParams(location.search).get('chase');
