@@ -7,6 +7,9 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import cm, mm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.graphics import renderSVG
+from reportlab.graphics.barcode import qr
+from reportlab.graphics.shapes import Drawing
 from reportlab.platypus import (
     Image,
     KeepTogether,
@@ -22,6 +25,7 @@ from reportlab.platypus import (
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "mrta_camp" / "Bangkok_Transit_3D_MRTA_Application.pdf"
+QR_SVG = ROOT / "mrta_camp" / "qr-github-pages.svg"
 
 # แก้ 3 ค่านี้ก่อนส่งจริง ถ้าชื่อทีม/โรงเรียน/URL เปลี่ยน
 PROJECT_NAME = "Bangkok Transit 3D"
@@ -160,6 +164,22 @@ def img(path, width_mm):
     return im
 
 
+def qr_drawing(value, size_mm=34):
+    widget = qr.QrCodeWidget(value)
+    bounds = widget.getBounds()
+    width = bounds[2] - bounds[0]
+    height = bounds[3] - bounds[1]
+    size = size_mm * mm
+    drawing = Drawing(size, size, transform=[size / width, 0, 0, size / height, 0, 0])
+    drawing.add(widget)
+    return drawing
+
+
+def write_qr_svg():
+    drawing = qr_drawing(DEMO_URL, 48)
+    renderSVG.drawToFile(drawing, str(QR_SVG))
+
+
 def feature_table(rows):
     data = [[p("<b>ฟีเจอร์</b>"), p("<b>ประโยชน์ต่อผู้ใช้/กรรมการ</b>")]]
     data.extend([[p(a), p(b)] for a, b in rows])
@@ -192,6 +212,7 @@ def footer(canvas, doc):
 
 
 def build():
+    write_qr_svg()
     doc = SimpleDocTemplate(
         str(OUT),
         pagesize=A4,
@@ -222,11 +243,23 @@ def build():
             ),
             Spacer(1, 7 * mm),
             p(f"<b>Demo URL:</b> {DEMO_URL}"),
-            p("หาก URL ยังไม่เปิด ให้ใช้ไฟล์ PDF นี้ร่วมกับ GitHub Pages หลัง deploy", "ThaiSmall"),
-            Spacer(1, 8 * mm),
-            img("mrta_camp/features-1-5-final-desktop.png", 154),
-            Spacer(1, 6 * mm),
-            p("ภาพจาก prototype จริงของ Bangkok Transit 3D", "ThaiSmall"),
+            p("สแกน QR เพื่อลองใช้งานบนมือถือ แล้วกด Add to Home Screen/ติดตั้งเว็บแอป เพื่อทดลองแบบแอปจริง", "ThaiSmall"),
+            Spacer(1, 3 * mm),
+            Table(
+                [[qr_drawing(DEMO_URL, 35), p("<b>Scan to open prototype</b><br/>เปิดบนมือถือได้ทันที และติดตั้งเป็น PWA ได้จากเมนู browser", "ThaiSmall")]],
+                colWidths=[42 * mm, 95 * mm],
+                style=TableStyle(
+                    [
+                        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                        ("ALIGN", (0, 0), (0, 0), "CENTER"),
+                        ("BOX", (0, 0), (-1, -1), 0.4, colors.HexColor("#d5dde3")),
+                        ("LEFTPADDING", (0, 0), (-1, -1), 8),
+                        ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+                        ("TOPPADDING", (0, 0), (-1, -1), 6),
+                        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+                    ]
+                ),
+            ),
             PageBreak(),
         ]
     )
