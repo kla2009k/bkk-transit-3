@@ -1,10 +1,11 @@
 // Service worker — app shell cache-first, data network-first (PWA offline).
-const CORE = 'bkk3d-core-v11'; // bump on shell changes — activate clears old caches
-const DATA = 'bkk3d-data-v11';
+const CORE = 'bkk3d-core-v13'; // bump on shell changes — activate clears old caches
+const DATA = 'bkk3d-data-v13';
 const SHELL = [
   './', 'index.html', 'css/style.css', 'icon.svg', 'manifest.json',
   'js/app.js', 'js/city.js', 'js/planner.js', 'js/service.js',
   'js/theme.js', 'js/ridership.js', 'js/firstride.js', 'js/pages.js',
+  'js/journey.js', 'js/places.js', 'js/place-ui.js',
   'vendor/three/three.module.js',
   'vendor/three/addons/controls/OrbitControls.js',
   'vendor/three/addons/postprocessing/EffectComposer.js',
