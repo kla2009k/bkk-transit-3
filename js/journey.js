@@ -116,8 +116,9 @@ export function choosePlaceJourney(graph, origin, destination, options = {}) {
 export function chooseBestExit(exits, destination) {
   if (!Array.isArray(exits) || !exits.length || !isValidPlace(destination)) return null;
   const valid = exits.filter(isValidPlace);
+  const referenced = valid.filter((exit) => exit.ref);
   const labelled = valid.filter((exit) => exit.ref || exit.name);
-  const candidates = labelled.length ? labelled : valid;
+  const candidates = referenced.length ? referenced : (labelled.length ? labelled : valid);
   let best = null;
   for (const exit of candidates) {
     const straightMeters = Math.round(haversine(exit, destination));

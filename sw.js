@@ -1,6 +1,6 @@
 // Service worker — app shell cache-first, data network-first (PWA offline).
-const CORE = 'bkk3d-core-v13'; // bump on shell changes — activate clears old caches
-const DATA = 'bkk3d-data-v13';
+const CORE = 'bkk3d-core-v14'; // bump on shell changes — activate clears old caches
+const DATA = 'bkk3d-data-v14';
 const SHELL = [
   './', 'index.html', 'css/style.css', 'icon.svg', 'manifest.json',
   'js/app.js', 'js/city.js', 'js/planner.js', 'js/service.js',

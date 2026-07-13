@@ -675,7 +675,7 @@ function renderRoutePanel(result) {
       <div class="rt-place-row rt-place-dest"><span class="rt-place-icon">🏁</span><div>
         <b>${escHTML(placeJourney.destination.name)}</b><br>
         <span class="muted">ลงสถานี ${escHTML(placeJourney.destinationStation.nameTh)}${placeJourney.bestExit
-          ? ` · ใช้${escHTML(placeJourney.bestExit.label)} · เดินประมาณ ${placeJourney.bestExit.walkMeters.toLocaleString('th-TH')} ม.`
+          ? ` · ใช้ ${escHTML(placeJourney.bestExit.label)} · เดินประมาณ ${placeJourney.bestExit.walkMeters.toLocaleString('th-TH')} ม.`
           : ` · เดินประมาณ ${placeJourney.egress.walkMeters.toLocaleString('th-TH')} ม.`}</span>
       </div></div>
       <small class="muted">ระยะเดินเป็นค่าประมาณจากพิกัด ไม่ใช่เส้นทางเดินแบบเลี้ยวต่อเลี้ยว</small>
