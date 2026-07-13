@@ -12,12 +12,17 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { initRidership } from './ridership.js';
 import { initFirstRide } from './firstride.js';
 import { initPages } from './pages.js';
+import { initPlacePlanner } from './place-ui.js';
 import { buildCity } from './city.js';
 import { buildGraph, findRoute, haversine } from './planner.js';
 import { DAY, T } from './theme.js';
 import { bandOf, BAND_LABEL_TH, headwayFor, trainCountFor, RIDE_KMH,
          computeFares, flatFare, sunAt, co2Saved,
          serviceHours, crowdLevel, ledgerAdd } from './service.js';
+
+const escHTML = (value = '') => String(value).replace(/[&<>"']/g, (char) => ({
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+}[char]));
 
 // official DRT fare table (optional — ladder fallback when absent)
 let fareLookup = null;
@@ -542,7 +547,7 @@ function buildLegend(lines) {
 
 // ── route planner wiring ─────────────────────────────────────────────
 let graph = null;
-const routeState = { from: null, to: null, overlay: new THREE.Group(), markers: [] };
+const routeState = { from: null, to: null, placeJourney: null, overlay: new THREE.Group(), markers: [] };
 scene.add(routeState.overlay);
 const routePanel = document.getElementById('route');
 const routeBody = document.getElementById('route-body');
@@ -567,6 +572,7 @@ function makeMarker(pos, color) {
 function clearRoute() {
   routeState.from = routeState.to = null;
   routeState.result = null;
+  routeState.placeJourney = null;
   setCityDim(false);
   routeState.markers.length = 0;
   routeState.overlay.clear();
@@ -576,8 +582,10 @@ function clearRoute() {
   routePanel.classList.remove('active');
   routeBody.innerHTML = '<span class="muted">คลิกสถานีต้นทาง แล้วคลิกสถานีปลายทาง</span>';
   const p = new URLSearchParams(location.search);
-  if (p.has('route')) {
+  if (p.has('route') || p.has('placeFrom') || p.has('placeTo')) {
     p.delete('route');
+    p.delete('placeFrom');
+    p.delete('placeTo');
     history.replaceState(null, '', location.pathname + (p.size ? '?' + p : ''));
   }
   if (typeof updateSbSum === 'function') updateSbSum();
@@ -657,6 +665,21 @@ function routeFareSummary(result = routeState.result) {
 
 function renderRoutePanel(result) {
   const km = (result.totalM / 1000).toFixed(1);
+  const placeJourney = routeState.placeJourney;
+  const placeIntro = placeJourney ? `
+    <section class="rt-place-summary" aria-label="สรุปการเดินทางจากสถานที่ถึงสถานที่">
+      <div class="rt-place-row"><span class="rt-place-icon">🚶</span><div>
+        <b>${escHTML(placeJourney.origin.name)}</b><br>
+        <span class="muted">เดินประมาณ ${placeJourney.access.walkMeters.toLocaleString('th-TH')} ม. ไปสถานี ${escHTML(placeJourney.originStation.nameTh)}</span>
+      </div></div>
+      <div class="rt-place-row rt-place-dest"><span class="rt-place-icon">🏁</span><div>
+        <b>${escHTML(placeJourney.destination.name)}</b><br>
+        <span class="muted">ลงสถานี ${escHTML(placeJourney.destinationStation.nameTh)}${placeJourney.bestExit
+          ? ` · ใช้${escHTML(placeJourney.bestExit.label)} · เดินประมาณ ${placeJourney.bestExit.walkMeters.toLocaleString('th-TH')} ม.`
+          : ` · เดินประมาณ ${placeJourney.egress.walkMeters.toLocaleString('th-TH')} ม.`}</span>
+      </div></div>
+      <small class="muted">ระยะเดินเป็นค่าประมาณจากพิกัด ไม่ใช่เส้นทางเดินแบบเลี้ยวต่อเลี้ยว</small>
+    </section>` : '';
   // journey card: numbered instructions in platform-signage language —
   // readable by someone who has never ridden the system
   let stepNo = 0;
@@ -729,7 +752,8 @@ function renderRoutePanel(result) {
   }
 
   routeBody.innerHTML = `
-    <div class="rt-stats">~${result.minutes} นาที · ${km} กม. · ${result.stationCount} สถานี · เปลี่ยน ${result.transfers} ครั้ง</div>
+    ${placeIntro}
+    <div class="rt-stats">~${placeJourney?.totalMinutes ?? result.minutes} นาทีรวม · ${km} กม. บนราง · ${result.stationCount} สถานี · เปลี่ยน ${result.transfers} ครั้ง</div>
     ${timingRow}
     ${steps}
     ${exitHint}
@@ -765,6 +789,10 @@ function selectStation(mesh) {
   const id = mesh.userData.nodeId;
   if (!routeState.from || (routeState.from && routeState.to)) {
     clearRoute();
+    const placeFrom = document.getElementById('place-from-input');
+    const placeTo = document.getElementById('place-to-input');
+    if (placeFrom) placeFrom.value = '';
+    if (placeTo) placeTo.value = '';
     routeState.from = id;
     makeMarker(mesh.position, 0xd4af5f);
     routePanel.classList.add('active');
@@ -794,6 +822,46 @@ function selectStation(mesh) {
       routeBody.innerHTML = '<span class="muted">หาเส้นทางไม่ได้ — ลองสถานีอื่น</span>';
     }
   }
+}
+
+function planNodeTrip(fromId, toId, placeJourney = null) {
+  if (!graph || fromId === toId) return false;
+  const fromMesh = meshOf(fromId);
+  const toMesh = meshOf(toId);
+  if (!fromMesh || !toMesh) return false;
+
+  clearRoute();
+  routeState.from = fromId;
+  routeState.to = toId;
+  routeState.placeJourney = placeJourney;
+  makeMarker(fromMesh.position, 0xd4af5f);
+  makeMarker(toMesh.position, 0xffffff);
+  const result = findRoute(graph, fromId, toId);
+  if (!result) return false;
+
+  routeState.result = result;
+  highlightRoute(result);
+  renderRoutePanel(result);
+  routePanel.classList.add('active');
+  const first = result.legs[0].nodes[0].station;
+  const lastLeg = result.legs[result.legs.length - 1];
+  const last = lastLeg.nodes[lastLeg.nodes.length - 1].station;
+  fromInput.value = first.name_th || first.name_en;
+  toInput.value = last.name_th || last.name_en;
+
+  const params = new URLSearchParams(location.search);
+  if (placeJourney) {
+    params.delete('route');
+    params.set('placeFrom', `${placeJourney.origin.lat},${placeJourney.origin.lon},${placeJourney.origin.name}`);
+    params.set('placeTo', `${placeJourney.destination.lat},${placeJourney.destination.lon},${placeJourney.destination.name}`);
+    saveRecent(placeJourney.origin.name, placeJourney.destination.name);
+  } else {
+    params.set('route', `${fromInput.value},${toInput.value}`);
+  }
+  history.replaceState(null, '', `${location.pathname}?${params}`);
+  updateSbSum();
+  miniSearch(true);
+  return true;
 }
 
 document.getElementById('route-clear').addEventListener('click', clearRoute);
@@ -966,8 +1034,10 @@ const searchbarEl = document.getElementById('searchbar');
 const sbSum = document.getElementById('sb-sum');
 const isMobile = () => innerWidth <= 640;
 function updateSbSum() {
+  const placeFrom = document.getElementById('place-from-input')?.value.trim();
+  const placeTo = document.getElementById('place-to-input')?.value.trim();
   sbSum.textContent = routeState.result
-    ? `${fromInput.value} → ${toInput.value}`
+    ? `${placeFrom || fromInput.value} → ${placeTo || toInput.value}`
     : '🔍 ค้นหาเส้นทาง…';
 }
 function miniSearch(on) {
@@ -976,7 +1046,7 @@ function miniSearch(on) {
 }
 sbSum.addEventListener('click', () => {
   searchbarEl.classList.remove('mini');
-  fromInput.focus();
+  (document.getElementById('place-from-input') || fromInput).focus();
 });
 if (isMobile()) miniSearch(true);
 updateSbSum();
@@ -1568,6 +1638,15 @@ async function boot() {
     }
   }
   buildSearchIndex();
+  await initPlacePlanner({
+    graph,
+    exitsForNode: (nodeId) => exitsByStation.get(nodeId) ?? [],
+    onJourney: (journey) => planNodeTrip(
+      journey.originStation.nodeId,
+      journey.destinationStation.nodeId,
+      journey,
+    ),
+  });
 
   // (route auto-plan runs after startIntro — snap mode resets opacities and
   // must not clobber the route highlight)
@@ -1638,7 +1717,7 @@ async function boot() {
     startFirstRide: () => firstRide?.startFirstRide(),
     focusSearch: () => {
       searchbarEl.classList.remove('mini');
-      fromInput.focus();
+      (document.getElementById('place-from-input') || fromInput).focus();
     },
     openStats: () => {
       document.getElementById('panel').classList.remove('collapsed');

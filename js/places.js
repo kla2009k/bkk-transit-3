@@ -96,7 +96,10 @@ export function parseGoogleMapsInput(rawValue) {
       const query = sanitizePlaceQuery(url.searchParams.get(key));
       if (query) return { type: 'query', query };
     }
-    return { type: 'unsupported-link', url: url.toString() };
+    const sharedLabel = sanitizePlaceQuery(raw.replace(urlText, ''));
+    return sharedLabel
+      ? { type: 'query', query: sharedLabel }
+      : { type: 'unsupported-link', url: url.toString() };
   } catch {
     return { type: 'query', query: sanitizePlaceQuery(raw) };
   }

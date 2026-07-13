@@ -58,6 +58,13 @@ test('Google Maps coordinates and query links are parsed without fetching arbitr
   );
 });
 
+test('Google Maps share text keeps the place name when its short link has no coordinates', () => {
+  assert.deepEqual(
+    parseGoogleMapsInput('สยามพารากอน https://maps.app.goo.gl/example'),
+    { type: 'query', query: 'สยามพารากอน' },
+  );
+});
+
 test('place queries are length-bounded and whitespace-normalized', () => {
   assert.equal(sanitizePlaceQuery('  Siam   Paragon  '), 'Siam Paragon');
   assert.equal(sanitizePlaceQuery('x'.repeat(400)).length, 160);

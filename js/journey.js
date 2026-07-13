@@ -115,12 +115,17 @@ export function choosePlaceJourney(graph, origin, destination, options = {}) {
 
 export function chooseBestExit(exits, destination) {
   if (!Array.isArray(exits) || !exits.length || !isValidPlace(destination)) return null;
+  const valid = exits.filter(isValidPlace);
+  const labelled = valid.filter((exit) => exit.ref || exit.name);
+  const candidates = labelled.length ? labelled : valid;
   let best = null;
-  for (const exit of exits) {
-    if (!isValidPlace(exit)) continue;
+  for (const exit of candidates) {
     const straightMeters = Math.round(haversine(exit, destination));
     if (best && best.straightMeters <= straightMeters) continue;
-    const fallback = exit.name ? String(exit.name) : 'Exit';
+    const rawName = exit.name ? String(exit.name) : '';
+    const fallback = /^\d+[A-Za-z]?$/.test(rawName)
+      ? `ทางออก ${rawName}`
+      : rawName || 'ทางออกที่ใกล้ปลายทาง';
     best = {
       ...exit,
       label: exit.ref ? `ทางออก ${String(exit.ref)}` : fallback,

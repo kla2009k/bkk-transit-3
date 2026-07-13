@@ -1,0 +1,21 @@
+{
+  "updated": "2026-07-13",
+  "note": "Curated fallback for common Bangkok destinations; online search provides broader coverage.",
+  "places": [
+    {"id":"siam-paragon","name":"สยามพารากอน","address":"ถนนพระรามที่ 1 ปทุมวัน กรุงเทพฯ","aliases":["Siam Paragon","พารากอน"],"lat":13.7462,"lon":100.5348,"type":"shopping_mall"},
+    {"id":"centralworld","name":"เซ็นทรัลเวิลด์","address":"แยกราชประสงค์ ปทุมวัน กรุงเทพฯ","aliases":["CentralWorld","เซ็นทรัลเวิล์ด"],"lat":13.7466,"lon":100.5393,"type":"shopping_mall"},
+    {"id":"iconsiam","name":"ไอคอนสยาม","address":"ถนนเจริญนคร คลองสาน กรุงเทพฯ","aliases":["ICONSIAM","ไอคอน สยาม"],"lat":13.7263,"lon":100.5100,"type":"shopping_mall"},
+    {"id":"terminal21-asok","name":"เทอร์มินอล 21 อโศก","address":"แยกอโศก ถนนสุขุมวิท กรุงเทพฯ","aliases":["Terminal 21 Asok","Terminal21"],"lat":13.7378,"lon":100.5601,"type":"shopping_mall"},
+    {"id":"wat-arun","name":"วัดอรุณราชวราราม","address":"ถนนวังเดิม บางกอกใหญ่ กรุงเทพฯ","aliases":["วัดอรุณ","Wat Arun"],"lat":13.7437,"lon":100.4889,"type":"attraction"},
+    {"id":"grand-palace","name":"พระบรมมหาราชวัง","address":"ถนนหน้าพระลาน พระนคร กรุงเทพฯ","aliases":["Grand Palace","วัดพระแก้ว"],"lat":13.7500,"lon":100.4914,"type":"attraction"},
+    {"id":"chula-hospital","name":"โรงพยาบาลจุฬาลงกรณ์","address":"ถนนพระรามที่ 4 ปทุมวัน กรุงเทพฯ","aliases":["Chulalongkorn Hospital","รพ.จุฬา"],"lat":13.7325,"lon":100.5357,"type":"hospital"},
+    {"id":"siriraj-hospital","name":"โรงพยาบาลศิริราช","address":"ถนนวังหลัง บางกอกน้อย กรุงเทพฯ","aliases":["Siriraj Hospital","รพ.ศิริราช"],"lat":13.7580,"lon":100.4855,"type":"hospital"},
+    {"id":"kasetsart-university","name":"มหาวิทยาลัยเกษตรศาสตร์ บางเขน","address":"ถนนงามวงศ์วาน จตุจักร กรุงเทพฯ","aliases":["Kasetsart University","มก. บางเขน"],"lat":13.8474,"lon":100.5715,"type":"university"},
+    {"id":"chulalongkorn-university","name":"จุฬาลงกรณ์มหาวิทยาลัย","address":"ถนนพญาไท ปทุมวัน กรุงเทพฯ","aliases":["Chulalongkorn University","จุฬา"],"lat":13.7384,"lon":100.5321,"type":"university"},
+    {"id":"chatuchak-market","name":"ตลาดนัดจตุจักร","address":"ถนนกำแพงเพชร 2 จตุจักร กรุงเทพฯ","aliases":["Chatuchak Weekend Market","JJ Market"],"lat":13.7998,"lon":100.5501,"type":"market"},
+    {"id":"victory-monument","name":"อนุสาวรีย์ชัยสมรภูมิ","address":"ถนนพหลโยธิน ราชเทวี กรุงเทพฯ","aliases":["Victory Monument"],"lat":13.7649,"lon":100.5383,"type":"landmark"},
+    {"id":"don-mueang-airport","name":"ท่าอากาศยานดอนเมือง","address":"ถนนวิภาวดีรังสิต ดอนเมือง กรุงเทพฯ","aliases":["Don Mueang Airport","สนามบินดอนเมือง","DMK"],"lat":13.9126,"lon":100.6068,"type":"airport"},
+    {"id":"suvarnabhumi-airport","name":"ท่าอากาศยานสุวรรณภูมิ","address":"อำเภอบางพลี สมุทรปราการ","aliases":["Suvarnabhumi Airport","สนามบินสุวรรณภูมิ","BKK Airport"],"lat":13.6900,"lon":100.7501,"type":"airport"},
+    {"id":"queen-sirikit-convention","name":"ศูนย์การประชุมแห่งชาติสิริกิติ์","address":"ถนนรัชดาภิเษก คลองเตย กรุงเทพฯ","aliases":["QSNCC","Queen Sirikit National Convention Center"],"lat":13.7238,"lon":100.5581,"type":"convention_center"}
+  ]
+}

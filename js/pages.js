@@ -6,6 +6,7 @@
 
 let ctx = null;
 let pageEl, tabbar;
+const PITCH_MODE = new URLSearchParams(location.search).has('pitch');
 
 const OFFICIAL = [
   ['🟢 BTS (สุขุมวิท/สีลม/ทอง)', 'https://www.bts.co.th'],
@@ -652,7 +653,7 @@ function pageRules() {
 
 function pageNews() {
   return `
-  <div class="pg-title">ข่าวสาร &amp; โปรโมชัน</div>
+  <div class="pg-title">สถานะการเดินทาง</div>
   <div class="pg-item pg-highlight">🏷️ <b>นโยบาย 20 บาทตลอดสาย ใช้ได้ถึง 30 ก.ย. 2569</b><br>
     ลงทะเบียนผ่านแอปทางรัฐ · เปลี่ยนสายใน 30 นาที · จบทริปใน 180 นาที
     <button class="pg-mini" data-act="fare20">ดูเงื่อนไขเต็ม</button></div>
@@ -664,7 +665,7 @@ function pageNews() {
     <button class="pg-card" data-act="announcements">📢<span>ประกาศ<br>ผู้ให้บริการ</span></button>
     <button class="pg-card" data-act="serviceNotice">🚧<span>สถานะบริการ<br>และเหตุพิเศษ</span></button>
     <button class="pg-card" data-act="officialLinks">🔗<span>ช่องทาง<br>ทางการ</span></button>
-    <button class="pg-card" data-act="incidentFeed">⚙️<span>Incident<br>roadmap</span></button>
+    ${PITCH_MODE ? '<button class="pg-card" data-act="incidentFeed">⚙️<span>Incident<br>roadmap</span></button>' : ''}
   </div>
   <div class="pg-note">เราไม่ทำ feed ข่าวปลอมในแอปนี้ เพราะโปรโมชันและประกาศเปลี่ยนได้ตลอด จึงพาไปแหล่งทางการแทน</div>`;
 }
@@ -758,25 +759,38 @@ function pageOfficialLinks() {
 }
 
 function pageMore() {
+  const pitchTools = PITCH_MODE ? `
+    <div class="pg-sec">เครื่องมือพรีเซนต์</div>
+    <div class="pg-list">
+      <button class="pg-item pg-row" data-act="demoMode">🎬 Demo Mode ปุ่มเดียว <span>›</span></button>
+      <button class="pg-item pg-row" data-act="judgeSummary">🏆 สรุปสำหรับกรรมการ <span>›</span></button>
+      <button class="pg-item pg-row" data-act="judgeQA">❓ คำถามกรรมการ / Q&amp;A <span>›</span></button>
+      <button class="pg-item pg-row" data-act="mrtaMode">🏛️ MRTA Mode <span>›</span></button>
+      <button class="pg-item pg-row" data-act="userJourney">🧭 User Journey <span>›</span></button>
+      <button class="pg-item pg-row" data-act="personas">👥 Persona Cards <span>›</span></button>
+      <button class="pg-item pg-row" data-act="aiMobility">🤖 AI Mobility Lab <span>›</span></button>
+      <button class="pg-item pg-row" data-act="transitCopilot">💬 Transit AI Copilot <span>›</span></button>
+      <button class="pg-item pg-row" data-act="incidentFeed">🚧 Incident Feed roadmap <span>›</span></button>
+    </div>` : '';
   return `
   <div class="pg-title">เพิ่มเติม</div>
   <div class="pg-hero">
-    <div><b>พร้อมส่งประกวด</b><br><span>เดโมกรรมการ · pitch summary · data trust · accessibility · incident roadmap</span></div>
-    <button class="pg-mini" data-act="demoMode">เดโม</button>
+    <div><b>ตั้งค่าให้เดินทางสบายขึ้น</b><br><span>เหมาะกับผู้โดยสารใหม่และทุกคนที่ยังไม่คุ้นเส้นทาง</span></div>
+    <button class="pg-mini" data-act="firstRideHub">คู่มือ</button>
   </div>
-  <div class="pg-sec">ส่งประกวด / เดโม</div>
+  ${pitchTools}
+  <div class="pg-sec">เครื่องมือเดินทาง</div>
   <div class="pg-list">
-    <button class="pg-item pg-row" data-act="demoMode">🎬 Demo Mode ปุ่มเดียว <span>›</span></button>
-    <button class="pg-item pg-row" data-act="judgeSummary">🏆 สรุปสำหรับกรรมการ <span>›</span></button>
-    <button class="pg-item pg-row" data-act="judgeQA">❓ คำถามกรรมการ / Q&A <span>›</span></button>
-    <button class="pg-item pg-row" data-act="presetTrips">⭐ เส้นทางตัวอย่าง / Preset Trips <span>›</span></button>
-    <button class="pg-item pg-row" data-act="firstRideHub">🎓 First Ride mission cards <span>›</span></button>
+    <button class="pg-item pg-row" data-act="presetTrips">⭐ เส้นทางตัวอย่าง <span>›</span></button>
+    <button class="pg-item pg-row" data-act="firstRideHub">🎓 คู่มือขึ้นรถไฟฟ้าครั้งแรก <span>›</span></button>
+    <button class="pg-item pg-row" data-act="accessibility">♿ ข้อมูลการเข้าถึง <span>›</span></button>
+    <button class="pg-item pg-row" data-act="fareCompare">⚖️ เทียบค่าโดยสาร 20฿ กับราคาปกติ <span>›</span></button>
+    <button class="pg-item pg-row" data-act="contact">☎️ ติดต่อผู้ให้บริการ / ของหาย <span>›</span></button>
   </div>
   <div class="pg-sec">ตั้งค่าการใช้งาน</div>
   <div class="pg-list">
     <button class="pg-item pg-row" data-act="theme">🌗 สลับโหมดกลางวัน / กลางคืน <span>›</span></button>
     <button class="pg-item pg-row" data-act="big">🔎 โหมดตัวหนังสือใหญ่ <span>›</span></button>
-    <button class="pg-item pg-row" data-act="mrtaMode">🏛️ MRTA Mode สำหรับเดโมกรรมการ <span>›</span></button>
     <button class="pg-item pg-row" data-act="clear">🧹 ล้างประวัติการค้นหา/สถิติในเครื่อง <span>›</span></button>
   </div>
   <div class="pg-sec">เกี่ยวกับ</div>
@@ -784,19 +798,11 @@ function pageMore() {
     <button class="pg-item pg-row" data-act="about">ℹ️ เกี่ยวกับแอป + ที่มาข้อมูล + ผลกระทบ <span>›</span></button>
     <button class="pg-item pg-row" data-act="dataSources">📚 ที่มาข้อมูลแบบละเอียด <span>›</span></button>
     <button class="pg-item pg-row" data-act="dataStatus">🏷️ สถานะข้อมูล / data labels <span>›</span></button>
-    <button class="pg-item pg-row" data-act="userJourney">🧭 User Journey <span>›</span></button>
-    <button class="pg-item pg-row" data-act="personas">👥 Persona Cards <span>›</span></button>
-    <button class="pg-item pg-row" data-act="aiMobility">🤖 AI Mobility Lab / Crowd Prediction <span>›</span></button>
-    <button class="pg-item pg-row" data-act="transitCopilot">💬 Transit AI Copilot <span>›</span></button>
     <button class="pg-item pg-row" data-act="carbonImpact">🌱 Carbon / Energy Impact <span>›</span></button>
-    <button class="pg-item pg-row" data-act="accessibility">♿ Accessibility Layer <span>›</span></button>
-    <button class="pg-item pg-row" data-act="incidentFeed">🚧 Incident Feed roadmap <span>›</span></button>
-    <button class="pg-item pg-row" data-act="fareCompare">⚖️ เทียบค่าโดยสาร 20฿ vs ปกติ <span>›</span></button>
-    <button class="pg-item pg-row" data-act="contact">☎️ ติดต่อผู้ให้บริการ / ของหาย <span>›</span></button>
     <button class="pg-item pg-row" data-act="privacy">🔐 ความเป็นส่วนตัว <span>›</span></button>
     <button class="pg-item pg-row" data-act="onboard">🎬 ดูวิธีใช้อีกครั้ง <span>›</span></button>
     <div class="pg-item">🏷️ เวอร์ชัน 1.0 · ข้อมูล: ค่าโดยสาร เม.ย. 2569 · ผู้โดยสาร มี.ค. 2569 · แผนที่ OSM ก.ค. 2569<br>
-    <span class="pg-note">โปรเจกต์นักเรียนเพื่อ MRTA Innovation Camp 2026 · © OpenStreetMap contributors (ODbL)</span></div>
+    <span class="pg-note">BKK Transit 3D · © OpenStreetMap contributors (ODbL)</span></div>
   </div>`;
 }
 
@@ -999,6 +1005,7 @@ function wireCopilot() {
 
 export function initPages(context) {
   ctx = context;
+  document.body.classList.toggle('pitch', PITCH_MODE);
   pageEl = document.getElementById('page');
   tabbar = document.getElementById('tabbar');
   tabbar.querySelectorAll('.tb-item').forEach(btn => {

@@ -4,9 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>กรุงเทพฯ Transit 3D — แผนที่รถไฟฟ้ากรุงเทพ 3 มิติ วางแผนเดินทาง + ค่าโดยสาร</title>
-<meta name="description" content="แผนที่ 3D รถไฟฟ้ากรุงเทพครบ 10 สาย 193 สถานี จากข้อมูลจริง OpenStreetMap — วางแผนเส้นทาง เปรียบเทียบค่าโดยสาร 20 บาทตลอดสาย ดูรถไฟวิ่งตามตารางจริง นั่งมุมหัวขบวน">
+<meta name="description" content="ค้นหาจากสถานที่ต้นทางถึงปลายทาง แล้วรับคำแนะนำสถานี สายรถไฟฟ้า จุดเปลี่ยน Exit ระยะเดิน ค่าโดยสาร และซ้อมเส้นทางบนแผนที่กรุงเทพ 3 มิติ">
 <meta property="og:title" content="กรุงเทพฯ Transit 3D — แผนที่รถไฟฟ้า 3 มิติ">
-<meta property="og:description" content="วางแผนเดินทางรถไฟฟ้ากรุงเทพบนแผนที่ 3D — 10 สาย 193 สถานี ค่าโดยสารจริง รถไฟวิ่งตาม headway จริง">
+<meta property="og:description" content="พิมพ์ชื่อสถานที่ แล้วรู้ว่าต้องเข้าสถานีไหน ขึ้นสายอะไร ออก Exit ไหน พร้อมซ้อมเส้นทางบนแผนที่ 3D">
 <meta property="og:type" content="website">
 <meta name="theme-color" content="#04060c">
 <link rel="manifest" href="manifest.json">
@@ -33,20 +33,51 @@
   <div class="sub">โครงข่ายรถไฟฟ้า · ข้อมูลจริงจาก OpenStreetMap</div>
 </header>
 
-<!-- primary action: route search, front and center -->
+<!-- Primary action: people know places, not station names. -->
 <section class="hud hud-search" id="searchbar">
-  <div class="sb-sum" id="sb-sum">🔍 ค้นหาเส้นทาง…</div>
-  <div class="sb-row">
-    <span class="sb-dot sb-from"></span>
-    <input id="from-input" list="station-list" placeholder="จากสถานี…" autocomplete="off">
-    <button id="geo-btn" title="สถานีใกล้ฉัน">📍</button>
-  </div>
-  <div class="sb-row">
-    <span class="sb-dot sb-to"></span>
-    <input id="to-input" list="station-list" placeholder="ไปสถานี…" autocomplete="off">
-    <button id="swap-btn" title="สลับต้นทาง-ปลายทาง">⇅</button>
-  </div>
-  <div class="sb-recents" id="recents"></div>
+  <div class="sb-sum" id="sb-sum">🔍 จะไปที่ไหน?</div>
+  <div class="sb-kicker">เดินทางด้วยรถไฟฟ้า จากสถานที่ถึงสถานที่</div>
+  <form id="place-form" novalidate>
+    <div class="sb-row place-field">
+      <span class="sb-dot sb-from" aria-hidden="true"></span>
+      <label class="sr-only" for="place-from-input">สถานที่ต้นทาง</label>
+      <input id="place-from-input" type="search" placeholder="จากสถานที่ เช่น บ้าน หรือ ม.เกษตร" autocomplete="off"
+        role="combobox" aria-autocomplete="list" aria-controls="place-from-options">
+      <button id="place-geo-btn" type="button" title="ใช้ตำแหน่งปัจจุบัน" aria-label="ใช้ตำแหน่งปัจจุบันเป็นต้นทาง">📍</button>
+      <div class="place-options" id="place-from-options" role="listbox" hidden></div>
+    </div>
+    <div class="sb-row place-field">
+      <span class="sb-dot sb-to" aria-hidden="true"></span>
+      <label class="sr-only" for="place-to-input">สถานที่ปลายทาง</label>
+      <input id="place-to-input" type="search" placeholder="ไปสถานที่ เช่น สยามพารากอน" autocomplete="off"
+        role="combobox" aria-autocomplete="list" aria-controls="place-to-options">
+      <button id="place-swap-btn" type="button" title="สลับต้นทาง-ปลายทาง" aria-label="สลับต้นทางและปลายทาง">⇅</button>
+      <div class="place-options" id="place-to-options" role="listbox" hidden></div>
+    </div>
+    <button class="place-submit" type="submit">ดูเส้นทางรถไฟฟ้า</button>
+  </form>
+  <div class="place-status" id="place-status" role="status" aria-live="polite">เลือกจากรายการ หรือพิมพ์ชื่อแล้วกดดูเส้นทาง</div>
+  <details class="station-search">
+    <summary>รู้ชื่อสถานีอยู่แล้ว? ค้นแบบสถานี</summary>
+    <div class="sb-row">
+      <input id="from-input" list="station-list" placeholder="จากสถานี…" autocomplete="off" aria-label="สถานีต้นทาง">
+      <button id="geo-btn" type="button" title="สถานีใกล้ฉัน" aria-label="หาสถานีใกล้ฉัน">📍</button>
+    </div>
+    <div class="sb-row">
+      <input id="to-input" list="station-list" placeholder="ไปสถานี…" autocomplete="off" aria-label="สถานีปลายทาง">
+      <button id="swap-btn" type="button" title="สลับต้นทาง-ปลายทาง" aria-label="สลับสถานีต้นทางและปลายทาง">⇅</button>
+    </div>
+    <div class="sb-recents" id="recents"></div>
+  </details>
+  <details class="google-import">
+    <summary>มีสถานที่จาก Google Maps?</summary>
+    <form id="google-import-form">
+      <label class="sr-only" for="google-import-input">วางชื่อหรือลิงก์ Google Maps</label>
+      <input id="google-import-input" type="text" placeholder="วางชื่อหรือลิงก์ Google Maps" autocomplete="off">
+      <button type="submit">รับสถานที่</button>
+    </form>
+  </details>
+  <div class="place-attribution">สถานที่: OpenStreetMap/Geoapify เมื่อเปิดใช้ · ระยะเดินเป็นค่าประมาณ</div>
 </section>
 <datalist id="station-list"></datalist>
 
@@ -108,17 +139,17 @@
 <div id="about" hidden>
   <div class="ob-card ab-card">
     <div class="ob-title">🚇 กรุงเทพฯ Transit 3D</div>
-    <p class="ab-lead">แผนที่ 3 มิติมีชีวิตของระบบรถไฟฟ้ากรุงเทพฯ ครบ 10 สาย 193 สถานี —
-    วางแผนเดินทาง เห็นราคาก่อนออกจากบ้าน และ "ซ้อมเดินทาง" ได้เหมือนไปมาแล้ว</p>
-    <div class="ab-sec">🏆 Why MRTA should care</div>
-    <p class="ab-body">โปรเจกต์นี้ลด friction ก่อนผู้โดยสารขึ้นระบบรางจริง: ไม่รู้ขึ้นสายไหน,
+    <p class="ab-lead">ผู้ช่วยเดินทางด้วยระบบรางจากสถานที่ถึงสถานที่ —
+    เลือกสถานี เส้นทาง จุดเปลี่ยน Exit และระยะเดิน พร้อม "ซ้อมเดินทาง" บนเมือง 3 มิติ</p>
+    <div class="ab-sec pitch-only">🏆 Why MRTA should care</div>
+    <p class="ab-body pitch-only">โปรเจกต์นี้ลด friction ก่อนผู้โดยสารขึ้นระบบรางจริง: ไม่รู้ขึ้นสายไหน,
     กลัวเปลี่ยนสาย, ไม่แน่ใจค่าโดยสาร, และกังวลเรื่องทางออก/ลิฟต์ — ทั้งหมดถูกแปลงเป็น
     route card, 3D preview, First Ride Simulator, MRTA Mode และหน้าที่มาข้อมูลที่ตรวจสอบได้</p>
-    <div class="ab-sec">🎬 What judges should try</div>
-    <p class="ab-body">กด <b>เพิ่มเติม → Demo Mode</b> เพื่อเปิดโหมดกรรมการ: spotlight สาย รฟม.,
+    <div class="ab-sec pitch-only">🎬 What judges should try</div>
+    <p class="ab-body pitch-only">กด <b>เพิ่มเติม → Demo Mode</b> เพื่อเปิดโหมดกรรมการ: spotlight สาย รฟม.,
     วางเส้นทางตัวอย่าง, เทียบสิทธิ 20 บาทกับราคาปกติ และต่อด้วยซ้อมเดินทางแบบ 3D</p>
-    <div class="ab-sec">🚀 Next version</div>
-    <p class="ab-body">ต่อ official incident feed, API ค่าโดยสาร/เวลาเดินรถ, accessibility dataset
+    <div class="ab-sec pitch-only">🚀 Next version</div>
+    <p class="ab-body pitch-only">ต่อ official incident feed, API ค่าโดยสาร/เวลาเดินรถ, accessibility dataset
     ที่ครบทุกสถานี, notification เฉพาะสายที่ผู้ใช้บันทึกไว้ และ route planning ที่หลีกเลี่ยงบันไดได้</p>
     <div class="ab-sec">📊 ที่มาข้อมูล (ทั้งหมดคือข้อมูลเปิด)</div>
     <ul class="ab-list">
@@ -178,7 +209,7 @@
 <nav id="tabbar">
   <button class="tb-item on" data-tab="map">🗺️<span>แผนที่</span></button>
   <button class="tb-item" data-tab="services">🎫<span>บริการ</span></button>
-  <button class="tb-item" data-tab="news">📰<span>ข่าวสาร</span></button>
+  <button class="tb-item" data-tab="news">🚦<span>สถานะ</span></button>
   <button class="tb-item" data-tab="more">☰<span>เพิ่มเติม</span></button>
 </nav>
 
