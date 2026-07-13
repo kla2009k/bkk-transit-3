@@ -22,7 +22,7 @@ Source URL: https://drt.gdcatalog.go.th/dataset/2f475b29-1792-4bb3-9946-6f0f5a86
 |---|---|---|---|---|
 | bts_gold | 3 | 0 | 3 | 100.0% |
 | bts_silom | 13 | 0 | 13 | 100.0% |
-| bts_sukhumvit | 46 | 2 | 48 | 95.8% |
+| bts_sukhumvit | 47 | 1 | 48 | 97.9% |
 | mrt_blue | 37 | 0 | 37 | 100.0% |
 | mrt_pink | 30 | 0 | 30 | 100.0% |
 | mrt_purple | 16 | 0 | 16 | 100.0% |
@@ -34,16 +34,13 @@ Source URL: https://drt.gdcatalog.go.th/dataset/2f475b29-1792-4bb3-9946-6f0f5a86
 
 ### bts_sukhumvit
 
-- `Mo Chit` -> nearest candidate: `Phloen Chit` / `เพลินจิต` (ratio=0.62)
 - `Sena Ruam*` -> nearest candidate: `Sena Nikhom` / `เสนานิคม` (ratio=0.56)
-
-Note: `Mo Chit` and `Sena Ruam*` have no counterpart at all in data/transit.json's bts_sukhumvit station list (verified by full-text search, not just a normalization miss) -- this is a gap in the app's OSM-derived station graph, not a mapping bug. They cannot be aliased since there is no target station to alias to.
 
 ## Summary
 
 - Total DRT rows: 6953
-- Rows mapped to app pairs: 6713
-- Row coverage: 96.55%
-- Total unique fare pairs emitted: 3447
+- Rows mapped to app pairs: 6832
+- Row coverage: 98.26%
+- Total unique fare pairs emitted: 3507
 - Fare range: 12 - 65 THB
-- Output file size: 114614 bytes
+- Output file size: 116883 bytes

@@ -261,14 +261,6 @@ def main():
         lines_out.append("")
 
     coverage_pct = (mapped_rows / total_rows * 100) if total_rows else 0.0
-    lines_out.append(
-        "Note: `Mo Chit` and `Sena Ruam*` have no counterpart at all in "
-        "data/transit.json's bts_sukhumvit station list (verified by full-text "
-        "search, not just a normalization miss) -- this is a gap in the app's "
-        "OSM-derived station graph, not a mapping bug. They cannot be aliased "
-        "since there is no target station to alias to.\n"
-    )
-
     lines_out.append("## Summary\n")
     lines_out.append(f"- Total DRT rows: {total_rows}")
     lines_out.append(f"- Rows mapped to app pairs: {mapped_rows}")
